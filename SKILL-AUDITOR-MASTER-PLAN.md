@@ -1261,26 +1261,31 @@ export class SkillENS {
 
 > **Architecture decision:** `skillauditor-app` does NOT import from `packages/skill-types`. It uses its own `lib/types.ts` with API response shapes only. This keeps Vercel deployment simple (root dir = `apps/skillauditor-app`).
 
-### F.2 — API Foundation
-- [ ] Mount all route stubs in `src/index.ts`
-- [ ] Route stubs (return 501): `routes/v1/submit.ts`, `routes/v1/audit.ts`, `routes/v1/skills.ts`, `routes/v1/verify.ts`
-- [ ] Management route stubs: `routes/management/users.ts`, `orgs.ts`, `api-keys.ts`, `usage.ts`
-- [ ] Stub services: `services/onchain-registry.ts` + `services/ens-registry.ts` (typed no-ops implementing `IOnchainRegistry` / `IENSRegistry`)
-- [ ] Auth middleware stub: `src/middleware/auth.ts` (API key path — no Privy yet)
-- [ ] MongoDB client (`src/db/client.ts`) — needs `MONGODB_URI`
-- [ ] Rate limiting middleware (`src/middleware/rate-limit.ts`) — needs Redis or in-memory store
-- [ ] Privy auth middleware (`src/middleware/auth.ts`) — needs `PRIVY_APP_ID` + `PRIVY_APP_SECRET`
-- [ ] x402 middleware (`src/middleware/x402.ts`) — needs `USDC_BASE_ADDRESS` + treasury address
+### F.2 — API Foundation ✅ DONE
+- [x] `src/index.ts` — fully wired: cors, logger, rate limits, all routes mounted
+- [x] Route stubs (return 501): `routes/v1/submit.ts`, `routes/v1/audits.ts`, `routes/v1/skills.ts`, `routes/v1/verify.ts`, `routes/v1/ledger.ts`
+- [x] Management route stubs: `routes/management/users.ts`, `orgs.ts`, `api-keys.ts`, `usage.ts`
+- [x] Stub services: `services/onchain-registry.ts` + `services/ens-registry.ts` (typed no-ops implementing `IOnchainRegistry` / `IENSRegistry`)
+- [x] Auth middleware: `src/middleware/auth.ts` — API key (Mongoose lookup) + Privy session cookie
+- [x] Rate limiting middleware: `src/middleware/rate-limit.ts` — general (60/min) + submit (10/min) via `hono-rate-limiter`
+- [x] MongoDB client: `src/db/client.ts` — Mongoose connect, lazy (safe to start without `MONGODB_URI`)
+- [x] Mongoose models: `db/models/audit.ts`, `skill.ts`, `user.ts`, `api-key.ts`, `ledger-approval.ts` (with TTL index)
+- [ ] x402 middleware (`src/middleware/x402.ts`) — needs `USDC_BASE_ADDRESS` + treasury address (deferred to P.1)
 
-### F.3 — App Foundation
-- [ ] `PrivyProvider` wrapper in root layout
-- [ ] `lib/auth.ts` — Privy server auth, httpOnly `sa-session` cookie
-- [ ] `lib/management-client.ts` — typed fetch wrapper for `/management/*` using `lib/types.ts`
-- [ ] `app/api/auth/session/route.ts` — Privy JWT → set session cookie
-- [ ] `app/api/proxy/[...path]/route.ts` — server-side API proxy
-- [ ] Root layout with Privy login gate
+### F.3 — App Foundation ✅ DONE
+- [x] `components/privy-provider.tsx` — `PrivyProvider` (client-only, `ssr:false` — safe at build time)
+- [x] `components/auth-provider.tsx` — `AuthSync` silently posts Privy token to `/api/auth/session` after login
+- [x] `components/login-button.tsx` — Sign in / Sign out UI
+- [x] `lib/auth.ts` — `getSession()` + `requireSession()` — server-side Privy JWT verification via `next/headers` cookies
+- [x] `lib/management-client.ts` — typed fetch helpers forwarding session cookie to API
+- [x] `app/api/auth/session/route.ts` — POST (set `sa-session` httpOnly cookie) + DELETE (logout)
+- [x] `app/api/proxy/[...path]/route.ts` — server-side proxy forwarding session cookie + X-API-Key to Hono
+- [x] Root layout wired: `PrivyProvider` + `AuthSync` wrapping all pages
+- [x] `app/dashboard/page.tsx` — protected stub using `requireSession()`
 
-**→ Foundation Checkpoint: announce to team, teammates branch off here**
+> **Auth flow:** Privy login → `AuthSync` POSTs token → `/api/auth/session` sets httpOnly cookie → proxy forwards cookie to Hono → Hono verifies with Privy server SDK
+
+**→ Foundation Checkpoint: announce to team, teammates branch off here** ✅
 
 ---
 
@@ -1326,10 +1331,11 @@ export class SkillENS {
 
 ### P.4 — Ledger Trust Layer (split: feat/core-pipeline API + feat/frontend-apps UI)
 **feat/core-pipeline owns:**
-- [ ] `routes/v1/ledger/propose.ts` — agent creates pending approval, stored in MongoDB
-- [ ] `routes/v1/ledger/approve.ts` — frontend posts Ledger signature, unblocks agent
-- [ ] `routes/v1/ledger/pending.ts` — list pending approvals for authenticated user
-- [ ] MongoDB model: `ledger_approvals` (approvalId, agentId, transactionData, status, signature, TTL)
+- [x] `routes/v1/ledger.ts` — stubs for propose / approve / pending (return 501)
+- [x] MongoDB model: `ledger-approval.ts` — TTL index auto-expires in 5 min
+- [ ] Implement `routes/v1/ledger/propose.ts` — agent creates pending approval, stored in MongoDB
+- [ ] Implement `routes/v1/ledger/approve.ts` — frontend posts Ledger signature, unblocks agent
+- [ ] Implement `routes/v1/ledger/pending.ts` — list pending approvals for authenticated user
 - [ ] `services/agentkit-session.ts` — update `writeRegistryStampAction` to call `/v1/ledger/propose` and poll for approval before broadcasting
 
 **feat/onchain-identity owns:**
