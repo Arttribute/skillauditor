@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { connectDb } from './db/client.js'
+import { connectDb, getDbStatus } from './db/client.js'
 import { authMiddleware } from './middleware/auth.js'
 import { generalRateLimit, submitRateLimit } from './middleware/rate-limit.js'
 
@@ -32,8 +32,10 @@ app.use('*', cors({
 }))
 
 // ── Health check ───────────────────────────────────────────────────────────────
-app.get('/', (c) => c.json({ status: 'ok', service: 'skillauditor-api' }))
-app.get('/health', (c) => c.json({ status: 'ok' }))
+app.get('/', (c) =>
+  c.json({ status: 'ok', service: 'skillauditor-api', db: getDbStatus() }),
+)
+app.get('/health', (c) => c.json({ status: 'ok', db: getDbStatus() }))
 
 // ── v1 routes ─────────────────────────────────────────────────────────────────
 app.use('/v1/*', generalRateLimit)
@@ -67,18 +69,38 @@ app.onError((err, c) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001
+const dbRetryDelayMs = 10_000
 
-async function start() {
-  // Only connect to DB if MONGODB_URI is set — allows local dev without MongoDB
-  if (process.env.MONGODB_URI) {
-    await connectDb()
-  } else {
+function scheduleDbConnectionRetry() {
+  setTimeout(() => {
+    void connectDbOnBackground()
+  }, dbRetryDelayMs)
+}
+
+async function connectDbOnBackground() {
+  if (!process.env.MONGODB_URI) {
     console.warn('MONGODB_URI not set — skipping DB connection')
+    return
   }
 
+  try {
+    await connectDb()
+  } catch (error) {
+    console.error('MongoDB connection failed during startup:', error)
+    console.log(`Retrying MongoDB connection in ${dbRetryDelayMs / 1000}s`)
+    scheduleDbConnectionRetry()
+  }
+}
+
+async function start() {
   serve({ fetch: app.fetch, port }, (info) => {
     console.log(`skillauditor-api running on http://localhost:${info.port}`)
   })
+
+  void connectDbOnBackground()
 }
 
-start()
+start().catch((error) => {
+  console.error('Fatal startup error:', error)
+  process.exit(1)
+})
