@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType } from 'mongoose'
+import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
 const skillSchema = new Schema(
   {
@@ -17,5 +17,5 @@ const skillSchema = new Schema(
   { timestamps: false },
 )
 
-export const Skill = models.Skill ?? model('Skill', skillSchema)
+export const Skill = mongoose.models.Skill ?? mongoose.model('Skill', skillSchema)
 export type SkillDoc = InferSchemaType<typeof skillSchema>

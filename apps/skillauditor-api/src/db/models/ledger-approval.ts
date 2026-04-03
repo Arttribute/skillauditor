@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType } from 'mongoose'
+import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
 const ledgerApprovalSchema = new Schema(
   {
@@ -14,5 +14,5 @@ const ledgerApprovalSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } },
 )
 
-export const LedgerApproval = models.LedgerApproval ?? model('LedgerApproval', ledgerApprovalSchema)
+export const LedgerApproval = mongoose.models.LedgerApproval ?? mongoose.model('LedgerApproval', ledgerApprovalSchema)
 export type LedgerApprovalDoc = InferSchemaType<typeof ledgerApprovalSchema>

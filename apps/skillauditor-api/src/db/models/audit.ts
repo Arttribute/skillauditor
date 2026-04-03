@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType } from 'mongoose'
+import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
 const toolCallEntrySchema = new Schema({
   tool:          { type: String, required: true },
@@ -66,5 +66,5 @@ const auditSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } },
 )
 
-export const Audit = models.Audit ?? model('Audit', auditSchema)
+export const Audit = mongoose.models.Audit ?? mongoose.model('Audit', auditSchema)
 export type AuditDoc = InferSchemaType<typeof auditSchema>

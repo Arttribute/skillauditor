@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType } from 'mongoose'
+import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
 const userSchema = new Schema(
   {
@@ -14,5 +14,5 @@ const userSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } },
 )
 
-export const User = models.User ?? model('User', userSchema)
+export const User = mongoose.models.User ?? mongoose.model('User', userSchema)
 export type UserDoc = InferSchemaType<typeof userSchema>

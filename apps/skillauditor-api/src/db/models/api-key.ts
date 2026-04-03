@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType } from 'mongoose'
+import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
 const apiKeySchema = new Schema(
   {
@@ -14,5 +14,5 @@ const apiKeySchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } },
 )
 
-export const ApiKey = models.ApiKey ?? model('ApiKey', apiKeySchema)
+export const ApiKey = mongoose.models.ApiKey ?? mongoose.model('ApiKey', apiKeySchema)
 export type ApiKeyDoc = InferSchemaType<typeof apiKeySchema>
