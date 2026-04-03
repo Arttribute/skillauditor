@@ -1252,24 +1252,30 @@ export class SkillENS {
 - [x] `apps/skillauditor-api/Dockerfile` — `node:22-slim`, standalone bundle pattern
 - [x] `apps/skillauditor-api/cloudbuild.yaml` — install → build packages → build API → pnpm deploy standalone → docker build/tag/push → Cloud Run deploy
 
-### F.1 — Monorepo + Shared Types
-- [ ] `tsconfig.base.json` at repo root
-- [ ] `packages/skill-types` — all interfaces: `SkillFrontmatter`, `ParsedSkill`, `StaticAnalysisReport`, `SandboxBehaviorReport`, `AuditVerdict`, `AuditReport`, `IOnchainRegistry`, `IENSRegistry`
-- [ ] MongoDB models: `AuditRecord`, `SkillRecord`, `UserRecord`
+### F.1 — Monorepo + Shared Types ✅ DONE
+- [x] `tsconfig.base.json` at repo root
+- [x] `packages/skill-types` — all interfaces: `SkillFrontmatter`, `ParsedSkill`, `StaticAnalysisReport`, `SandboxBehaviorReport`, `AuditVerdict`, `AuditReport`, `IOnchainRegistry`, `IENSRegistry`
+- [x] MongoDB document types: `AuditRecord`, `SkillRecord`, `UserRecord`, `ApiKeyRecord`, `LedgerApprovalRecord`
+- [x] `apps/skillauditor-app/lib/types.ts` — self-contained API response shapes (no workspace imports, Vercel-safe)
+- [x] `skillauditor-api` wired to `@skillauditor/skill-types` via `workspace:*`
+
+> **Architecture decision:** `skillauditor-app` does NOT import from `packages/skill-types`. It uses its own `lib/types.ts` with API response shapes only. This keeps Vercel deployment simple (root dir = `apps/skillauditor-app`).
 
 ### F.2 — API Foundation
-- [ ] MongoDB client (`src/db/client.ts`)
-- [ ] Privy auth middleware (`src/middleware/auth.ts`) — verifies session cookie or API key
-- [ ] Rate limiting middleware (`src/middleware/rate-limit.ts`)
-- [ ] x402 middleware (`src/middleware/x402.ts`) — gates Pro audit route, requires USDC on Base
-- [ ] Mount all routers in `src/index.ts`
-- [ ] Management routes (all 4): `users.ts`, `orgs.ts`, `api-keys.ts`, `usage.ts`
-- [ ] Stub services: `onchain-registry.ts` + `ens-registry.ts` (no-op, typed interfaces locked)
+- [ ] Mount all route stubs in `src/index.ts`
+- [ ] Route stubs (return 501): `routes/v1/submit.ts`, `routes/v1/audit.ts`, `routes/v1/skills.ts`, `routes/v1/verify.ts`
+- [ ] Management route stubs: `routes/management/users.ts`, `orgs.ts`, `api-keys.ts`, `usage.ts`
+- [ ] Stub services: `services/onchain-registry.ts` + `services/ens-registry.ts` (typed no-ops implementing `IOnchainRegistry` / `IENSRegistry`)
+- [ ] Auth middleware stub: `src/middleware/auth.ts` (API key path — no Privy yet)
+- [ ] MongoDB client (`src/db/client.ts`) — needs `MONGODB_URI`
+- [ ] Rate limiting middleware (`src/middleware/rate-limit.ts`) — needs Redis or in-memory store
+- [ ] Privy auth middleware (`src/middleware/auth.ts`) — needs `PRIVY_APP_ID` + `PRIVY_APP_SECRET`
+- [ ] x402 middleware (`src/middleware/x402.ts`) — needs `USDC_BASE_ADDRESS` + treasury address
 
 ### F.3 — App Foundation
-- [ ] `PrivyProvider` wrapper
+- [ ] `PrivyProvider` wrapper in root layout
 - [ ] `lib/auth.ts` — Privy server auth, httpOnly `sa-session` cookie
-- [ ] `lib/management-client.ts` — typed fetch wrapper for `/management/*`
+- [ ] `lib/management-client.ts` — typed fetch wrapper for `/management/*` using `lib/types.ts`
 - [ ] `app/api/auth/session/route.ts` — Privy JWT → set session cookie
 - [ ] `app/api/proxy/[...path]/route.ts` — server-side API proxy
 - [ ] Root layout with Privy login gate

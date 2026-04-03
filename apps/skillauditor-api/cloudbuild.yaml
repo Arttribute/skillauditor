@@ -47,6 +47,7 @@ steps:
       - --region=europe-west1
       - --platform=managed
       - --image=europe-west1-docker.pkg.dev/$PROJECT_ID/skillauditor/skillauditor-api:prod
+      - --allow-unauthenticated
     timeout: 1800s
 
 options:

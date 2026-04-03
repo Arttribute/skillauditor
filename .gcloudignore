@@ -1,0 +1,18 @@
+.gcloudignore
+.git/
+.gitignore
+
+# Foundry deps — large, not needed for Cloud Build
+contracts/lib/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# App build artifacts
+apps/skillauditor-app/.next/
+apps/*/dist/
+apps/*/standalone/
+
+# Local env files
+**/.env
+**/.env.local
