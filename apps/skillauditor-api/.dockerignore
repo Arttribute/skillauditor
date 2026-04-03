@@ -1,0 +1,10 @@
+node_modules/
+src/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+README.md
+cloudbuild.yaml
+tsconfig.json
