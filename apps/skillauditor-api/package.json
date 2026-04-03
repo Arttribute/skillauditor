@@ -8,8 +8,12 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",
+    "@privy-io/server-auth": "^1.32.5",
     "@skillauditor/skill-types": "workspace:*",
-    "hono": "^4.12.10"
+    "hono": "^4.12.10",
+    "hono-rate-limiter": "^0.5.3",
+    "mongodb": "^7.1.1",
+    "mongoose": "^9.4.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",

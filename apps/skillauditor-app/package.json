@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.19.0",
+    "@privy-io/server-auth": "^1.32.5",
     "next": "16.2.2",
     "react": "19.2.4",
     "react-dom": "19.2.4"
