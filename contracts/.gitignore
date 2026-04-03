@@ -1,0 +1,12 @@
+# Foundry build artifacts
+out/
+cache/
+
+# Broadcast logs (contain tx hashes — commit selectively if you want a deploy record)
+broadcast/
+
+# Env
+.env
+
+# Local Anvil state
+.anvil/

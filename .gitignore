@@ -1,0 +1,40 @@
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+pnpm-lock.yaml
+
+# ── Build output ──────────────────────────────────────────────────────────────
+dist/
+.next/
+coverage/
+**/dist/
+**/*.tsbuildinfo
+
+# ── Foundry ───────────────────────────────────────────────────────────────────
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+# keep lib (forge dependencies) but ignore nested build artifacts
+contracts/lib/**/out/
+contracts/lib/**/cache/
+
+# ── Env files ─────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# keep examples
+!**/.env.example
+
+# ── System ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
