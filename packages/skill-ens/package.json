@@ -1,0 +1,15 @@
+{
+  "name": "@skillauditor/skill-ens",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@skillauditor/skill-types": "workspace:*",
+    "viem": "^2.47.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
