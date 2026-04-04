@@ -4,6 +4,7 @@ import { runContentAnalysis } from './content-analyst.js'
 import { runSandboxAnalysis, type SandboxToolEvent } from './sandbox-runner.js'
 import { runVerdictAgent }    from './verdict-agent.js'
 import { onchainRegistry }    from './onchain-registry.js'
+import { uploadAuditReport }  from './ipfs.js'
 import { Audit } from '../db/models/audit.js'
 import { Skill } from '../db/models/skill.js'
 import type { AuditReport } from '@skillauditor/skill-types'
@@ -267,7 +268,27 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     recommendation:           verdict.recommendation,
   }
 
-  log.info('pipeline', 'Audit complete — persisting results')
+  log.info('pipeline', 'Audit complete — uploading report to IPFS')
+  await log.flush()
+
+  // ── IPFS upload (non-blocking on failure) ─────────────────────────────────────
+  let reportCid: string | null = null
+  try {
+    const ipfsResult = await uploadAuditReport(report)
+    if (ipfsResult) {
+      reportCid = ipfsResult.cid
+      log.info('pipeline', `Report pinned to IPFS — CID: ${reportCid}`)
+    } else {
+      log.warn('pipeline', 'IPFS upload skipped (PINATA_JWT not configured)')
+    }
+  } catch (err) {
+    log.warn('pipeline', `IPFS upload failed (non-fatal): ${(err as Error).message}`)
+  }
+
+  // Attach CID to report for onchain stamp
+  report.reportCid = reportCid ?? undefined
+
+  log.info('pipeline', 'Persisting final results')
 
   // ── Persist completed state ───────────────────────────────────────────────────
   await Promise.all([
@@ -279,6 +300,7 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
           'pipeline.verdict':    verdict,
           'result.verdict':      verdict.verdict,
           'result.score':        verdict.overallScore,
+          'result.reportCid':    reportCid,
           findings:              verdict.findings,
           completedAt:           new Date(),
         },
@@ -313,7 +335,7 @@ async function recordOnchain(auditId: string, report: AuditReport, log: Pipeline
       skillHash:  report.skillHash,
       verdict:    report.verdict,
       score:      report.overallScore,
-      reportCid:  '',
+      reportCid:  report.reportCid ?? '',
       ensSubname: '',
       nullifier:  '',
     })
