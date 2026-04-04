@@ -6,6 +6,7 @@ import { createMiddleware } from 'hono/factory'
 import { connectDb, getDbStatus } from './db/client.js'
 import { authMiddleware } from './middleware/auth.js'
 import { generalRateLimit, submitRateLimit } from './middleware/rate-limit.js'
+import { proPaymentGate } from './middleware/x402.js'
 
 // Routes — v1 (public + World ID gated)
 import submitRoute from './routes/v1/submit.js'
@@ -62,8 +63,9 @@ app.route('/v1/skills', skillsRoute)
 app.route('/v1/verify', verifyRoute)
 app.route('/v1/audits', auditsRoute)
 
-// World ID gated — auth handled inside the route
+// World ID gated + x402 Pro payment gate — auth handled inside the route
 app.use('/v1/submit', submitRateLimit)
+app.use('/v1/submit', proPaymentGate)
 app.route('/v1/submit', submitRoute)
 
 // Ledger — auth required
