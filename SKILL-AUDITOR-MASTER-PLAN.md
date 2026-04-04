@@ -34,6 +34,7 @@ SkillAuditor is a security auditing and verification service for Claude skills (
 | 5 | IPFS report upload (`services/ipfs.ts`) | All bounties |
 | 6 | Ledger ERC-7730 file + DMK browser component | Ledger $6k |
 | 7 | Public explore page + skill detail page | Demo quality |
+| 8 | `@skillauditor/client` — agent SDK that hides all complexity | Adoption |
 
 ---
 
@@ -932,7 +933,8 @@ skillauditor/                           (new monorepo)
 │   ├── skill-types/                    TypeScript types for SKILL.md + audit schemas
 │   ├── skill-auditor-core/             Audit pipeline (static + sandbox + judge)
 │   ├── skill-registry/                 Onchain registry client (Base)
-│   └── skill-ens/                      ENS integration (subname registry + resolution)
+│   ├── skill-ens/                      ENS integration (subname registry + resolution)
+│   └── skillauditor-client/            Agent SDK — verifySkill() wraps all protocol complexity
 ├── contracts/                          Foundry/Solidity
 │   ├── src/SkillRegistry.sol
 │   └── src/SkillSubnameRegistrar.sol
@@ -1234,6 +1236,77 @@ export class SkillENS {
 }
 ```
 
+## 7.5 @skillauditor/client — Agent SDK
+
+**Location:** `packages/skillauditor-client/`
+**Status:** ✅ Built and compiling
+
+The client SDK is the consumption layer for any external agent — Claude Code, a custom LLM agent, a CI pipeline — that wants to verify a skill before using it. It hides all protocol complexity: World AgentKit SIWE header construction, x402 payment handling, and audit polling.
+
+**Single-call API:**
+```typescript
+import { SkillAuditorClient } from '@skillauditor/client'
+
+// Dev mode — no keys, no payment, no AgentBook registration required
+const client = new SkillAuditorClient({ privateKey: 'dev' })
+const result = await client.verifySkill(skillContent)
+// → { verified: true, verdict: 'safe', score: 88, onchain: { txHash, ensName } }
+
+// Boolean shorthand — returns false instead of throwing
+if (await client.isSafe(skillContent)) { loadSkill() }
+
+// Check without auditing (fast path, no submission)
+const cached = await client.checkVerified(skillContent)
+```
+
+**Production config:**
+```typescript
+const client = new SkillAuditorClient({
+  apiUrl:         'https://api.skillauditor.dev',
+  privateKey:     process.env.AGENT_PRIVATE_KEY,  // must be registered in World AgentBook
+  tier:           'pro',                           // onchain stamp + ENS
+  paymentHandler: (req) => getPaymentHeader(req, wallet), // x402-fetch or Ledger EIP-3009
+  onProgress:     (event) => console.log(`[${event.stage}] ${event.message}`),
+})
+```
+
+**Internal flow:**
+```
+verifySkill(skillContent)
+  │
+  ├─ POST /v1/verify          ← already verified? return immediately (no audit)
+  │    verified: true ────────────────────────────────────────────► return
+  │    verified: false ↓
+  │
+  ├─ buildAgentkitHeader()    ← sign SIWE with privateKey (or send "dev:" bypass)
+  │
+  ├─ POST /v1/agent/submit    ← with agentkit header
+  │    HTTP 402 → paymentHandler() → retry with X-Payment header  (Pro tier only)
+  │    HTTP 202 → { auditId }
+  │
+  └─ pollUntilComplete()      ← GET /v1/audits/:auditId every 3s, streams onProgress logs
+       status: completed ─────────────────────────────────────────► return VerifyResult
+       verdict: unsafe  ─────────────────────────────────────────► throw SkillRejectedError
+```
+
+**Package structure:**
+```
+packages/skillauditor-client/
+  src/
+    client.ts     ← SkillAuditorClient class (verifySkill, isSafe, checkVerified)
+    agentkit.ts   ← SIWE header builder using @worldcoin/agentkit + viem
+    x402.ts       ← 402 detect → paymentHandler() → retry with X-Payment
+    poller.ts     ← poll /v1/audits/:id with backoff + onProgress log streaming
+    errors.ts     ← SkillRejectedError, AuditTimeoutError, PaymentError
+    index.ts      ← barrel exports
+```
+
+**Key design decisions:**
+- `privateKey: 'dev'` sends `agentkit: dev:<address>` — server accepts without verification when `WORLD_CHAIN_RPC_URL` is unset. Zero setup for local development.
+- `paymentHandler` is optional. Omitting it on `tier: 'pro'` throws a clear `PaymentError` explaining what's needed, rather than silently failing.
+- `rejectOnUnsafe: false` disables the `SkillRejectedError` throw — useful for auditing pipelines that want to log results rather than abort.
+- Progress streaming uses `/v1/audits/:auditId/logs?since=<ts>` — the same incremental endpoint the dashboard UI uses.
+
 ---
 
 # PART 8: DATA MODELS (MongoDB)
@@ -1473,14 +1546,17 @@ export class SkillENS {
 - [ ] Swagger UI at `/docs`
 
 ### 2.2 SDK
-- [ ] `@skillauditor/sdk` — typed client for API
-- [ ] `isSkillVerified(content)` — check stamp without API key
-- [ ] npm publish
+- [x] `@skillauditor/client` — agent SDK built (`packages/skillauditor-client/`)
+- [x] `verifySkill(content)` — single call hides World AgentKit + x402 + polling
+- [x] `isSafe(content)` — boolean shorthand, never throws
+- [x] `checkVerified(content)` — fast path check without submitting
+- [ ] npm publish `@skillauditor/client`
+- [ ] README with quickstart and paymentHandler examples
 
 ### 2.3 Agent Runtime Plugin
-- [ ] Claude Desktop / claude-code skill loader hook
+- [ ] Claude Code CLAUDE.md hook — `await client.isSafe(skill)` before loading any SKILL.md
 - [ ] Auto-check stamp before loading any SKILL.md
-- [ ] Warning UI if skill is unverified or failed audit
+- [ ] Warning output if skill is unverified or failed audit
 
 ### 2.4 Marketplace
 - [ ] Public skill registry at skillauditor.com/marketplace
@@ -1569,6 +1645,7 @@ export class SkillENS {
 | `mongoose` | MongoDB ODM |
 | `zod` | Schema validation |
 | `@safe-global/safe-core-sdk` | Safe multisig interaction |
+| `@skillauditor/client` | Agent SDK — verifySkill(), isSafe(), x402 + AgentKit handled internally |
 
 ## External Services
 

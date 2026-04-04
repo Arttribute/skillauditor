@@ -10,7 +10,7 @@ interface TestPageProps {
 }
 
 async function fetchSkill(hash: string): Promise<SkillResponse | null> {
-  const apiBase = process.env.API_BASE_URL ?? 'http://localhost:3001'
+  const apiBase = process.env.API_URL ?? 'http://localhost:3001'
   try {
     const res = await fetch(`${apiBase}/v1/skills/${hash}`, { cache: 'no-store' })
     if (res.status === 404) return null
@@ -22,7 +22,7 @@ async function fetchSkill(hash: string): Promise<SkillResponse | null> {
 }
 
 async function fetchAudit(auditId: string): Promise<AuditResponse | null> {
-  const apiBase = process.env.API_BASE_URL ?? 'http://localhost:3001'
+  const apiBase = process.env.API_URL ?? 'http://localhost:3001'
   try {
     const res = await fetch(`${apiBase}/v1/audits/${auditId}`, { cache: 'no-store' })
     if (!res.ok) return null

@@ -1,0 +1,26 @@
+{
+  "name": "@skillauditor/client",
+  "version": "0.1.0",
+  "description": "Agent SDK for SkillAuditor — submit, verify, and check skills onchain in one call",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@worldcoin/agentkit": "^0.1.6",
+    "viem": "^2.47.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "typescript": "^5.8.3"
+  }
+}
