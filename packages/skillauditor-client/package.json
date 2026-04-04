@@ -1,8 +1,19 @@
 {
   "name": "@skillauditor/client",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "Agent SDK for SkillAuditor — submit, verify, and check skills onchain in one call",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arttribute/skillauditor.git",
+    "directory": "packages/skillauditor-client"
+  },
+  "keywords": ["skillauditor", "skill", "agent", "sdk", "ens", "onchain", "worldcoin"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -11,9 +22,17 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "skillauditor": "./dist/cli.js",
+    "skillauditor-client": "./dist/cli.js"
+  },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc && chmod +x dist/cli.js",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@worldcoin/agentkit": "^0.1.6",
