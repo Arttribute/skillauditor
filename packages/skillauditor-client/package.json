@@ -36,7 +36,8 @@
   },
   "dependencies": {
     "@worldcoin/agentkit": "^0.1.6",
-    "viem": "^2.47.10"
+    "viem": "^2.47.10",
+    "x402": "^0.7.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",

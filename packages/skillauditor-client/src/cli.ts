@@ -9,8 +9,9 @@
 import { readFileSync } from 'fs'
 import { resolve }      from 'path'
 import { parseArgs }    from 'util'
-import { SkillAuditorClient }                      from './client.js'
-import { SkillRejectedError, AuditTimeoutError, PaymentError } from './errors.js'
+import { SkillAuditorClient }                                   from './client.js'
+import { SkillRejectedError, AuditTimeoutError, PaymentError }  from './errors.js'
+import { createX402PaymentHandler }                             from './x402.js'
 
 // ── Help text ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ const HELP = `
   skillauditor verify ./SKILL.md --verbose
 
   # Pro tier — onchain stamp + ENS subname on completion
+  # Wallet must hold USDC on Base and be registered in World AgentBook:
+  #   npx @worldcoin/agentkit-cli register <wallet-address>
   skillauditor verify ./SKILL.md --tier pro --key 0xYOUR_PRIVATE_KEY
 
   # Silent gate — use in scripts / CI
@@ -58,6 +61,14 @@ const HELP = `
 
   # Point at a remote API
   skillauditor verify ./SKILL.md --api-url https://api.skillauditor.xyz
+
+\x1b[1mWORLD AGENTKIT (Pro tier)\x1b[0m
+  Pro audits require a World ID-verified agent wallet. The payment is
+  automatically handled via the x402 protocol ($9 USDC on Base).
+
+  1. Register your wallet: npx @worldcoin/agentkit-cli register <address>
+  2. Fund it with USDC on Base (or Base Sepolia for testnet)
+  3. Run: skillauditor verify ./SKILL.md --tier pro --key 0xYOUR_KEY
 `
 
 // ── Arg parsing ───────────────────────────────────────────────────────────────
@@ -119,16 +130,33 @@ async function main() {
   }
 
   // ── Build client ────────────────────────────────────────────────────────────
-  const tier    = values.tier === 'pro' ? 'pro' : 'free'
-  const silent  = values.silent  as boolean
-  const verbose = values.verbose as boolean
-  const logs    = silent ? false : verbose ? 'verbose' : true
+  const tier       = values.tier === 'pro' ? 'pro' : 'free'
+  const silent     = values.silent  as boolean
+  const verbose    = values.verbose as boolean
+  const logs       = silent ? false : verbose ? 'verbose' : true
+  const privateKey = values.key as string
+
+  // Wire x402 payment handler for pro tier when a real key is supplied.
+  // The handler uses x402/client to sign an EIP-3009 transferWithAuthorization
+  // and returns the base64-encoded receipt for the X-Payment retry header.
+  const isRealKey      = privateKey !== 'dev' && privateKey.startsWith('0x')
+  const paymentHandler = (tier === 'pro' && isRealKey)
+    ? createX402PaymentHandler(privateKey)
+    : undefined
+
+  if (tier === 'pro' && !isRealKey && !silent) {
+    console.warn(
+      '\x1b[33m[warn]\x1b[0m --tier pro requires a real EVM private key (--key 0x...).\n' +
+      '       Register your wallet first: npx @worldcoin/agentkit-cli register <address>',
+    )
+  }
 
   const client = new SkillAuditorClient({
     apiUrl:         values['api-url'] as string,
-    privateKey:     values.key        as string,
+    privateKey,
     tier,
     logs,
+    paymentHandler,
     rejectOnUnsafe: !(values['no-reject'] as boolean),
     timeoutMs:      Number(values.timeout),
   })
