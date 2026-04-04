@@ -177,7 +177,7 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
   log.info('sandbox', `Sandbox simulation complete — ${runs.length} run(s)`)
 
   // Count total tool calls across all runs
-  const totalToolCalls = runs.reduce((sum, r) => {
+  const totalToolCalls = runs.reduce((sum: number, r) => {
     const run = r as { toolCallLog?: unknown[] }
     return sum + (run.toolCallLog?.length ?? 0)
   }, 0)

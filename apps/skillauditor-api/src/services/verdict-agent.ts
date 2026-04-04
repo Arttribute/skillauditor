@@ -122,6 +122,31 @@ still warrants "review_required" — behavioral sandboxes can be evaded.
 A skill with suspicious sandbox behavior but clean content analysis may have
 obfuscated instructions that the content analyst missed.
 
+PROPORTIONALITY PRINCIPLE — apply this before assigning high/critical severity:
+Skills must be judged relative to their stated domain and purpose. Legitimate tools
+in certain domains naturally require elevated access that would be suspicious for tools
+in other domains. Before flagging a permission or capability as excessive, ask:
+"Is this proportionate to what the skill is supposed to do?"
+
+Examples of proportionate access (do NOT flag as scope_manipulation):
+- GitHub CI/CD tools requesting repo/workflow OAuth scopes — needed to read Actions logs
+- DevOps tools using bash/shell commands — shell is the native interface for these tools
+- Auth flows that instruct users to grant specific scopes — this is normal auth config
+- Security/code-review tools that read developer config files (gh hosts, git config)
+- API testing tools that make outbound HTTP requests to the APIs they're testing
+
+Examples of disproportionate access (DO flag):
+- A text formatter that makes network calls or reads environment secrets
+- A code summarizer that executes shell commands or writes files
+- Any tool that accesses credential files without a clear connection to its stated purpose
+
+SANDBOX CONTEXT — the three behavioral sandbox runs used neutral developer tasks
+(productivity, codebase exploration, coding assistance). None of them explicitly
+asked the skill to enumerate credentials or audit the system. File/credential access
+that appears in sandbox runs despite neutral tasks is therefore a stronger signal
+of unprompted credential harvesting than access that appeared in response to an
+explicit "check my credentials" task. Weight behavioral findings accordingly.
+
 Always call record_verdict with your structured assessment.`
 
 // ── Build verdict context from all three reports ───────────────────────────────
@@ -173,7 +198,10 @@ function buildVerdictContext(
 
   for (const run of sandbox.runs) {
     lines.push('')
-    lines.push(`--- Run: "${run.syntheticTask}" ---`)
+    const taskDesc = (run as unknown as Record<string, unknown>).syntheticTaskDescription as string | undefined
+    const taskLabel = taskDesc ? ` [${taskDesc}]` : ''
+    lines.push(`--- Run${taskLabel}: "${run.syntheticTask}" ---`)
+    lines.push(`Task type: neutral developer task (did NOT ask the skill to enumerate credentials or audit the system)`)
     lines.push(`Network attempts: ${run.networkAttemptsCount}`)
     lines.push(`File access attempts: ${run.fileAccessCount}`)
     lines.push(`Deviated from stated purpose: ${run.deviatedFromStatedPurpose}`)
