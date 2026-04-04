@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  WorldIDVerifier,
+  WorldIDVerificationBadge,
+  type WorldIDProof,
+} from '@/components/world-id/world-id-verifier'
 
 interface SubmitFormProps {
   userId: string
@@ -26,6 +31,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
   const [skillName, setSkillName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [worldIdProof, setWorldIdProof] = useState<WorldIDProof | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,6 +48,13 @@ export function SubmitForm({ userId }: SubmitFormProps) {
           skillContent: skillContent.trim(),
           skillName: skillName.trim() || undefined,
           userId,
+          // World ID 4.0 proof fields — present when verified, omitted in dev (server uses bypass)
+          ...(worldIdProof && {
+            proof:              worldIdProof.proof,
+            merkle_root:        worldIdProof.merkle_root,
+            nullifier_hash:     worldIdProof.nullifier_hash,
+            verification_level: worldIdProof.verification_level,
+          }),
         }),
       })
 
@@ -122,6 +135,24 @@ export function SubmitForm({ userId }: SubmitFormProps) {
             {charCount.toLocaleString()} / 500,000 chars
           </span>
         </div>
+      </div>
+
+      {/* World ID verification */}
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm font-medium text-zinc-700">Human Verification</p>
+          <p className="text-xs text-zinc-400">
+            World ID ensures each skill is submitted by a verified human — not a bot.
+          </p>
+        </div>
+        {worldIdProof ? (
+          <WorldIDVerificationBadge nullifierHash={worldIdProof.nullifier_hash} />
+        ) : (
+          <WorldIDVerifier
+            onSuccess={(proof) => setWorldIdProof(proof)}
+            label="Verify with World ID"
+          />
+        )}
       </div>
 
       {/* Error */}

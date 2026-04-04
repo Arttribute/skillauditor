@@ -134,10 +134,11 @@ export interface SkillENSConfig {
 function namehash(name: string): Hex {
   if (!name) return `0x${'00'.repeat(32)}` as Hex
   const labels = name.split('.').reverse()
-  let node = new Uint8Array(32)
+  let node: Uint8Array<ArrayBuffer> = new Uint8Array(32) as Uint8Array<ArrayBuffer>
   for (const label of labels) {
     const labelHash = keccak256(toBytes(label), 'bytes')
-    node = keccak256(concat([node, labelHash]), 'bytes')
+    const combined  = keccak256(concat([node, labelHash as unknown as Uint8Array<ArrayBuffer>]), 'bytes')
+    node = combined as unknown as Uint8Array<ArrayBuffer>
   }
   return `0x${Buffer.from(node).toString('hex')}` as Hex
 }
@@ -209,6 +210,7 @@ export class SkillENSClient implements IENSRegistry {
 
   async registerSkillSubname(skillHash: string, verdictData: VerdictData): Promise<string> {
     const registrar = this.requireRegistrar()
+    const account   = privateKeyToAccount(this.config.privateKey!)
     const wallet    = this.walletClient()
     const public_   = this.publicClient()
 
@@ -226,6 +228,8 @@ export class SkillENSClient implements IENSRegistry {
           auditor:   verdictData.auditorEns ?? '',
         },
       ],
+      account,
+      chain: this.chain,
     })
 
     const receipt = await public_.waitForTransactionReceipt({
@@ -288,8 +292,9 @@ export class SkillENSClient implements IENSRegistry {
       return
     }
 
-    const node   = namehash(ensName)
-    const wallet = this.walletClient()
+    const node    = namehash(ensName)
+    const account = privateKeyToAccount(this.config.privateKey!)
+    const wallet  = this.walletClient()
 
     const textUpdates: [string, string][] = [
       ['verdict',    data.verdict],
@@ -307,6 +312,8 @@ export class SkillENSClient implements IENSRegistry {
         abi:          RESOLVER_ABI,
         functionName: 'setText',
         args:         [node, key, value],
+        account,
+        chain:        this.chain,
       })
       await this.publicClient().waitForTransactionReceipt({
         hash: txHash, confirmations: 1, pollingInterval: 2_000, timeout: 60_000,

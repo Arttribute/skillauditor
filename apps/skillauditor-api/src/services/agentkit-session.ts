@@ -89,9 +89,9 @@ function cdpCredentials(): { apiKeyId: string; apiKeySecret: string } | null {
   return { apiKeyId, apiKeySecret }
 }
 
-function cdpNetworkId(): string {
+function cdpNetworkId(): 'base' | 'base-sepolia' {
   return Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532') === 8453
-    ? 'base-mainnet'
+    ? 'base'
     : 'base-sepolia'
 }
 

@@ -279,8 +279,9 @@ export class SkillRegistryClient implements IOnchainRegistry {
     const reportCidBytes32 = this.cidToBytes32(params.reportCid ?? '')
     const scoreUint        = Math.max(0, Math.min(100, Math.round(params.score)))
 
-    const wallet  = this.walletClient()
-    const address = this.config.contractAddress
+    const account  = privateKeyToAccount(this.config.privateKey!)
+    const wallet   = this.walletClient()
+    const address  = this.config.contractAddress
 
     console.log(
       `[skill-registry] recordStamp hash=${params.skillHash.slice(0, 10)}… ` +
@@ -292,6 +293,8 @@ export class SkillRegistryClient implements IOnchainRegistry {
       abi:          SKILL_REGISTRY_ABI,
       functionName: 'recordStamp',
       args:         [skillHashBytes32, verdictUint, scoreUint, reportCidBytes32],
+      account,
+      chain:        this.chain,
     })
 
     console.log(`[skill-registry] tx submitted: ${txHash}`)
@@ -301,12 +304,15 @@ export class SkillRegistryClient implements IOnchainRegistry {
   }
 
   async revokeStamp(skillHash: string): Promise<{ txHash: string }> {
+    const account = privateKeyToAccount(this.config.privateKey!)
     const wallet  = this.walletClient()
     const txHash  = await wallet.writeContract({
       address:      this.config.contractAddress,
       abi:          SKILL_REGISTRY_ABI,
       functionName: 'revokeStamp',
       args:         [this.toBytes32(skillHash)],
+      account,
+      chain:        this.chain,
     })
     await this.waitForReceipt(txHash)
     return { txHash }
@@ -314,12 +320,15 @@ export class SkillRegistryClient implements IOnchainRegistry {
 
   /** Backfill ENS node after SkillSubnameRegistrar registers the subname. */
   async updateEnsNode(skillHash: string, ensNode: string): Promise<{ txHash: string }> {
+    const account = privateKeyToAccount(this.config.privateKey!)
     const wallet  = this.walletClient()
     const txHash  = await wallet.writeContract({
       address:      this.config.contractAddress,
       abi:          SKILL_REGISTRY_ABI,
       functionName: 'updateEnsNode',
       args:         [this.toBytes32(skillHash), this.toBytes32(ensNode)],
+      account,
+      chain:        this.chain,
     })
     await this.waitForReceipt(txHash)
     return { txHash }

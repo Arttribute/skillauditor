@@ -20,7 +20,7 @@ async function fetchSkills(params: {
   verdict?: string
   page: number
 }): Promise<SkillListResponse> {
-  const apiBase = process.env.API_BASE_URL ?? 'http://localhost:3001'
+  const apiBase = process.env.API_URL ?? 'http://localhost:3001'
   const qs = new URLSearchParams()
   qs.set('page', String(params.page))
   qs.set('pageSize', '24')
