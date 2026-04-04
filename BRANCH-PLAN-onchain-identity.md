@@ -6,7 +6,7 @@
 >
 > Cross-reference: Team Plan §5 (Phase 1 — feat/onchain-identity)  
 > Master Plan Parts: 2, 3.2, 4, 7.3, 7.4, Part 10 P0.3–P0.5  
-> Last updated: 2026-04-04 (session 3)
+> Last updated: 2026-04-04 (session 4 — World AgentKit third-party agent flow implemented)
 
 ---
 
@@ -65,14 +65,32 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 | `services/onchain-registry.ts` — implement `IOnchainRegistry` using `skill-registry` | `apps/skillauditor-api/src/services/onchain-registry.ts` | ✅ Done | Delegates to `SkillRegistryClient`; env-gated no-op when keys absent |
 | `services/ens-registry.ts` — implement `IENSRegistry` using `skill-ens` | `apps/skillauditor-api/src/services/ens-registry.ts` | ✅ Done | Delegates to `SkillENSClient`; graceful stub fallback when registrar not deployed |
 
-### World AgentKit (with Ledger approval gate)
+### World AgentKit — Third-Party Agent Verification (bounty track)
+
+> Implements the World AgentKit bounty requirement: third-party agents present a
+> signed credential proving they are backed by a World ID-verified human, without
+> needing to embed a ZK proof in every request.
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| `services/agentkit-session.ts` — `createAuditAgent(worldIdProof)`: CDP wallet + AgentKit session | `apps/skillauditor-api/src/services/agentkit-session.ts` | ✅ Done | Full CDP SDK wired: `cdp.evm.createAccount()` per nullifier, `cdp.evm.sendTransaction()` for stamps; dev-key fallback when no CDP creds |
-| `writeRegistryStampAction` — polls `ledger_approvals` until `status=approved`, broadcasts | `agentkit-session.ts` | ✅ Done / ⏳ Gate blocked | Action implemented; gate bypasses with warning when routes return 501 (Blocker 2) |
-| `registerENSSubnameAction` — same Ledger approval gate for ENS registration | `agentkit-session.ts` | ✅ Done / ⏳ Gate blocked | Same bypass behaviour as above |
-| CDP wallet persisted in MongoDB keyed by nullifier | `agentkit-session.ts` (CdpWallet model) | ✅ Done | Mongoose model inline; `mode` field distinguishes `cdp` vs `dev` wallets |
+| `middleware/world-agentkit.ts` — parse `agentkit` header, validate SIWE message, verify signature, AgentBook lookup | `apps/skillauditor-api/src/middleware/world-agentkit.ts` | ✅ Done | Full flow: `parseAgentkitHeader` → `validateAgentkitMessage` → MongoDB nonce replay guard → `verifyAgentkitSignature` → `createAgentBookVerifier` → attaches `agentHumanId` to context |
+| `routes/v1/agent-submit.ts` — `/v1/agent/submit` endpoint for human-backed agents | `apps/skillauditor-api/src/routes/v1/agent-submit.ts` | ✅ Done | Protected by `worldAgentkitMiddleware`. Uses `agentHumanId` as nullifier for rate limiting. Routes through same `proPaymentGate` (x402) as browser submissions. Calls `startAuditPipeline` with `worldIdVerificationLevel: 'orb'`. |
+| Wire `/v1/agent/submit` in `index.ts` with `worldAgentkitMiddleware` + `proPaymentGate` | `apps/skillauditor-api/src/index.ts` | ✅ Done | Order: `submitRateLimit` → `worldAgentkitMiddleware` → `proPaymentGate` → route handler |
+| Add `@worldcoin/agentkit@^0.1.6` dependency | `apps/skillauditor-api/package.json` | ✅ Done | |
+| Add `WORLD_CHAIN_RPC_URL` + `WORLD_AGENTKIT_NETWORK` env vars | `.env.example` | ✅ Done | Dev bypass: leave `WORLD_CHAIN_RPC_URL` unset; send `agentkit: dev:<address>` header |
+
+### CDP AgentKit — Onchain Stamp Signing (Coinbase CDP SDK)
+
+> Note: this is separate from World AgentKit above. `agentkit-session.ts` manages
+> CDP wallets for signing `SkillRegistry.recordStamp()` transactions — not for
+> verifying incoming agent requests.
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| `services/agentkit-session.ts` — CDP wallet per World ID nullifier | `apps/skillauditor-api/src/services/agentkit-session.ts` | ✅ Built / ⚠️ Not wired | File is complete; `createAuditAgent` is exported but not yet called from `audit-pipeline.ts` (pipeline calls `onchainRegistry.recordStamp()` directly) |
+| `writeRegistryStampAction` — Ledger approval gate then CDP broadcast | `agentkit-session.ts` | ✅ Built / ⏳ Gate blocked | Gate bypasses when `/v1/ledger/propose` returns 501 (Blocker 2) |
+| `registerENSSubnameAction` — same gate for ENS registration | `agentkit-session.ts` | ✅ Built / ⏳ Gate blocked | Same bypass behaviour |
+| CDP wallet persisted in MongoDB keyed by nullifier | `agentkit-session.ts` (CdpWallet model) | ✅ Done | `mode` field: `cdp` vs `dev` fallback |
 
 ### ERC-7730 Clear Signing (Ledger bounty)
 
@@ -124,7 +142,9 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 | `DEPLOYED-ADDRESSES.md` filled | ⚠️ SkillRegistry ✅ — SkillSubnameRegistrar pending |
 | `onchain-registry.ts` real impl | ✅ |
 | `ens-registry.ts` real impl (with graceful fallback) | ✅ |
-| `agentkit-session.ts` present | ✅ |
+| `agentkit-session.ts` present (CDP stamp signing) | ✅ |
+| `world-agentkit.ts` middleware present (third-party agent auth) | ✅ |
+| `/v1/agent/submit` route live | ✅ |
 | ERC-7730 JSON present | ✅ |
 | SkillSubnameRegistrar deployed | ⏳ Blocker 1 |
 | Ledger approval gate live | ⏳ Blocker 2 |
@@ -150,7 +170,11 @@ ENS_REGISTRY_ADDRESS=                # TBD — Base Sepolia ENS registry
 ENS_RESOLVER_ADDRESS=                # TBD — Base Sepolia public resolver
 ENS_ROOT_NODE=                       # TBD — namehash("skills.auditor.eth")
 
-# ── CDP AgentKit ───────────────────────────────────────────────────────────
+# ── CDP AgentKit (onchain stamp signing) ──────────────────────────────────
 CDP_API_KEY_NAME=                    # Coinbase CDP API key name
 CDP_API_KEY_PRIVATE_KEY=             # Coinbase CDP API key private key
+
+# ── World AgentKit (third-party agent verification) ────────────────────────
+WORLD_CHAIN_RPC_URL=https://worldchain-mainnet.g.alchemy.com/public
+WORLD_AGENTKIT_NETWORK=world         # "world-testnet" for testnet AgentBook
 ```

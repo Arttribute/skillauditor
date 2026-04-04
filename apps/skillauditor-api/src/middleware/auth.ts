@@ -17,7 +17,7 @@ function getPrivy(): PrivyClient {
 export type AuthContext = {
   Variables: {
     userId: string
-    authMethod: 'privy' | 'api-key'
+    authMethod: 'privy' | 'api-key' | 'world-agentkit'
   }
 }
 
