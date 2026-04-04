@@ -72,8 +72,8 @@ skills.get('/:hash', async (c) => {
           verdict:        result?.verdict,
           score:          result?.score,
           findings:       auditDoc.findings,
-          recommendation: pipeline?.semanticJudge
-            ? (pipeline.semanticJudge as Record<string, unknown>).recommendation
+          recommendation: pipeline?.verdict
+            ? (pipeline.verdict as Record<string, unknown>).recommendation
             : undefined,
           completedAt: auditDoc.completedAt,
         }

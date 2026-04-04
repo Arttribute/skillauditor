@@ -46,13 +46,14 @@ audits.get('/:auditId', async (c) => {
       score:   result?.score,
     },
     findings: doc.findings,
-    dimensions:          pipeline?.semanticJudge
-      ? (pipeline.semanticJudge as Record<string, unknown>).dimensions
+    dimensions:          pipeline?.verdict
+      ? (pipeline.verdict as Record<string, unknown>).dimensions
       : undefined,
-    recommendation:      pipeline?.semanticJudge
-      ? (pipeline.semanticJudge as Record<string, unknown>).recommendation
+    recommendation:      pipeline?.verdict
+      ? (pipeline.verdict as Record<string, unknown>).recommendation
       : undefined,
-    staticAnalysis:      pipeline?.staticAnalysis,
+    structuralAnalysis:  pipeline?.structuralAnalysis,
+    contentAnalysis:     pipeline?.contentAnalysis,
     behavioralAnalysis:  pipeline?.sandboxRuns,
     onchain:             doc.onchain,
   })

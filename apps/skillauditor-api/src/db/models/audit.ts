@@ -42,9 +42,10 @@ const auditSchema = new Schema(
     tier:   { type: String, enum: ['free', 'pro'], required: true },
 
     pipeline: {
-      staticAnalysis: { type: Schema.Types.Mixed, default: null },
-      sandboxRuns:    { type: Schema.Types.Mixed, default: null },
-      semanticJudge:  { type: Schema.Types.Mixed, default: null },
+      structuralAnalysis: { type: Schema.Types.Mixed, default: null },
+      contentAnalysis:    { type: Schema.Types.Mixed, default: null },
+      sandboxRuns:        { type: Schema.Types.Mixed, default: null },
+      verdict:            { type: Schema.Types.Mixed, default: null },
     },
 
     result: {
