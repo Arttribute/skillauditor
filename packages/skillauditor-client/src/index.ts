@@ -2,5 +2,6 @@ export { SkillAuditorClient }                                    from './client.
 export type { SkillAuditorClientOptions, VerifyOptions, LogsOption } from './client.js'
 export type { VerifyResult, ProgressEvent, AuditFinding, OnchainStamp } from './poller.js'
 export type { PaymentHandler, X402PaymentRequirements }          from './x402.js'
+export { createX402PaymentHandler }                              from './x402.js'
 export { SkillRejectedError, AuditTimeoutError, PaymentError }   from './errors.js'
 export { createConsoleLogger }                                    from './logger.js'

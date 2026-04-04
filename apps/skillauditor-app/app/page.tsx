@@ -26,7 +26,7 @@ export default async function Home() {
 
       <main className="flex flex-col flex-1">
         {/* ── Hero ── */}
-        <section className="px-8 pt-20 pb-16 border-b border-zinc-100">
+        <section className="px-8 pt-24 pb-20 border-b border-zinc-100">
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left: headline + CTAs */}
             <div className="flex flex-col gap-8">
@@ -38,7 +38,7 @@ export default async function Home() {
                 <h1 className="text-5xl lg:text-6xl font-bold text-zinc-900 leading-[1.05] tracking-tight">
                   The <span className="text-blue-600">trust</span> layer
                   <br />
-                  for agent <span className="text-blue-600">skills</span>.
+                  for agent <span className="text-blue-600">skills.</span>
                 </h1>
                 <p className="text-base text-zinc-500 leading-relaxed max-w-md">
                   A skill can quietly expand an agent&apos;s scope, extract
@@ -75,30 +75,30 @@ export default async function Home() {
                 {[
                   {
                     label: "Scope manipulation",
-                    color: "bg-orange-500",
+                    color: "bg-orange-300",
                     light: "bg-orange-50",
-                    text: "text-orange-600",
+                    text: "text-gray-800",
                     desc: "Instructions that push agents beyond declared permissions",
                   },
                   {
                     label: "Secret exfiltration",
-                    color: "bg-yellow-400",
+                    color: "bg-yellow-300",
                     light: "bg-yellow-50",
-                    text: "text-yellow-700",
+                    text: "text-gray-800",
                     desc: "Directives routing credentials to unauthorized endpoints",
                   },
                   {
                     label: "Behavioral deception",
                     color: "bg-[#0052ff]",
                     light: "bg-[#eff4ff]",
-                    text: "text-[#0052ff]",
+                    text: "text-gray-800",
                     desc: "Skills that behave differently under analysis than in execution",
                   },
                   {
                     label: "Downstream manipulation",
-                    color: "bg-zinc-400",
+                    color: "bg-zinc-300",
                     light: "bg-zinc-50",
-                    text: "text-zinc-500",
+                    text: "text-gray-800",
                     desc: "Subverting actions and outputs visible to agents and users",
                   },
                 ].map(({ label, color, light, text, desc }) => (
@@ -106,7 +106,7 @@ export default async function Home() {
                     key={label}
                     className="flex items-center gap-4 px-5 py-4 bg-white hover:bg-zinc-50/60 transition-colors"
                   >
-                    <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+                    <span className={`h-2 w-2 rounded-full ${color}`} />
 
                     <div className="min-w-0">
                       <p className={`text-sm font-semibold ${text}`}>{label}</p>
