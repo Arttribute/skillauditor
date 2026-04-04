@@ -40,3 +40,14 @@ within the monorepo). They reference packages created by this branch and are req
 ## Closed Requests
 
 - REQ-001: `@coinbase/cdp-sdk` — added directly (2026-04-04, session 3)
+
+---
+
+## Retroactive notices (session 4)
+
+### RETRO-002 — feat/core-pipeline updated `@coinbase/cdp-sdk` version pin
+**Date:** 2026-04-04  
+**File:** `apps/skillauditor-api/package.json` (owned by `feat/core-pipeline`)  
+**Change:** Updated `@coinbase/cdp-sdk` from `^0.14.0` (non-existent) to `^1.46.1` (latest stable)  
+**Reason:** `^0.14.0` resolves to nothing on npm — the package skipped from `0.0.0-placeholder` to `1.x`. Required for `pnpm install` to succeed.  
+**Action needed by feat/onchain-identity:** Re-check `agentkit-session.ts` API surface against `@coinbase/cdp-sdk@1.46.1` — the SDK API may have changed between the version you designed against and `1.46.1`.

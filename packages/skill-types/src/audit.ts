@@ -143,5 +143,6 @@ export interface AuditReport {
   contentAnalysis: ContentAnalystReport;
   behavioralAnalysis: SandboxBehaviorReport;
   recommendation: string;
+  reportCid?: string;      // IPFS CID — set after Pinata upload, absent when IPFS skipped
   stamp?: OnchainStamp;
 }
