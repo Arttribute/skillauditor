@@ -25,12 +25,20 @@ export default async function DashboardPage() {
             <h1 className="text-xl font-semibold text-zinc-900">Dashboard</h1>
             <p className="text-sm text-zinc-400 mt-0.5 font-mono">{session.userId}</p>
           </div>
-          <Link
-            href="/dashboard/submit"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
-          >
-            + New Audit
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/settings"
+              className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+            >
+              Settings
+            </Link>
+            <Link
+              href="/dashboard/submit"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+            >
+              + New Audit
+            </Link>
+          </div>
         </div>
 
         {/* Recent audits */}
