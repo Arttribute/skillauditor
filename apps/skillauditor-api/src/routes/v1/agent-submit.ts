@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
-import { startAuditPipeline }   from '../../services/audit-pipeline.js'
-import { Audit }                 from '../../db/models/audit.js'
-import { runStaticAnalysis }     from '../../services/static-analyzer.js'
-import { checkNullifierRateLimit } from '../../services/world-id.js'
+import { startAuditPipeline }     from '../../services/audit-pipeline.js'
+import { Audit }                   from '../../db/models/audit.js'
+import { runStaticAnalysis }       from '../../services/static-analyzer.js'
+import { checkFreeQuota }          from '../../services/world-id.js'
+import {
+  buildFreeOverflowRequirements,
+  verifyX402Payment,
+} from '../../middleware/x402.js'
 import type { WorldAgentkitContext } from '../../middleware/world-agentkit.js'
 
 // POST /v1/agent/submit
@@ -20,7 +24,7 @@ import type { WorldAgentkitContext } from '../../middleware/world-agentkit.js'
 //
 // Pro tier payments follow the same x402 flow — the proPaymentGate middleware is
 // applied before this route in index.ts, so agents must include X-Payment with a
-// $9 USDC receipt on Base, exactly as browser users do.
+// $5 USDC receipt on Base, exactly as browser users do.
 //
 // Required body fields:
 //   skillContent   string   Raw SKILL.md content
@@ -64,20 +68,40 @@ agentSubmit.post('/', async (c) => {
       : staticPreview.frontmatter.name ?? 'Untitled Skill'
   )
 
-  // ── Rate limiting — keyed by human identifier ──────────────────────────────
-  // agentHumanId is the anonymous stable ID from AgentBook, equivalent to a
-  // World ID nullifier. The same human cannot exceed the tier quota regardless
-  // of how many agent wallets they register.
-  const rateCheck = await checkNullifierRateLimit(agentHumanId, tier)
-  if (!rateCheck.allowed) {
-    return c.json(
-      {
-        error:     `Rate limit exceeded — ${tier} tier allows ${tier === 'pro' ? 1 : 5} audit(s) per 24 hours per verified human`,
-        remaining: 0,
-        resetAt:   rateCheck.resetAt,
-      },
-      429,
-    )
+  // ── Free tier quota enforcement ────────────────────────────────────────────
+  // Pro tier: handled upstream by proPaymentGate middleware ($5 USDC each).
+  // Free tier: 3 per 30-day window; beyond that requires $0.10 USDC via x402.
+  // agentHumanId is the stable per-human key from AgentBook (equivalent to a
+  // World ID nullifier), so the same human cannot circumvent the quota by
+  // registering multiple agent wallets.
+  if (tier === 'free') {
+    const quota = await checkFreeQuota(agentHumanId)
+    if (quota.exhausted) {
+      const resourceUrl = c.req.url.split('?')[0]
+      const requirements = buildFreeOverflowRequirements(resourceUrl)
+      const paymentHeader = c.req.header('X-Payment')
+
+      if (!paymentHeader) {
+        return c.json(
+          {
+            ...requirements,
+            quota: { used: quota.used, total: quota.total, resetAt: quota.resetAt },
+          },
+          402,
+        )
+      }
+
+      const verification = await verifyX402Payment(paymentHeader, requirements)
+      if (!verification.isValid) {
+        return c.json(
+          {
+            error:  'Payment verification failed',
+            detail: verification.error ?? 'Invalid payment receipt',
+          },
+          402,
+        )
+      }
+    }
   }
 
   // ── Deduplicate in-flight audits on the same content hash ─────────────────

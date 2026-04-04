@@ -1,6 +1,6 @@
 // x402 payment handling for Pro tier audits.
 //
-// When the server returns HTTP 402, it means the request requires a $9 USDC
+// When the server returns HTTP 402, it means the request requires a $5 USDC
 // payment on Base before the audit pipeline will run. This module:
 //   1. Detects the 402 and extracts the payment requirements from the body
 //   2. Invokes a user-supplied `paymentHandler` with those requirements

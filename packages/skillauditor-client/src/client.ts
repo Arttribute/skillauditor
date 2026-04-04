@@ -48,7 +48,7 @@ export interface SkillAuditorClientOptions {
 
   /**
    * "free" (default) — LLM audit only, no onchain stamp, no payment required.
-   * "pro"            — full audit + onchain stamp + ENS subname, requires $9 USDC payment.
+   * "pro"            — full audit + onchain stamp + ENS subname, requires $5 USDC payment.
    */
   tier?: 'free' | 'pro'
 

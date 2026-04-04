@@ -95,12 +95,13 @@ export default async function SubmitPage() {
               <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Audit Tiers</p>
               <div className="flex flex-col gap-2.5 text-xs">
                 <div className="flex flex-col gap-0.5">
-                  <p className="font-semibold text-zinc-700">Free</p>
+                  <p className="font-semibold text-zinc-700">Free <span className="font-normal text-zinc-400">· 3/month included</span></p>
                   <p className="text-zinc-400">Full LLM pipeline · no onchain stamp</p>
+                  <p className="text-zinc-400 mt-0.5">$0.10 USDC per check after the monthly limit</p>
                 </div>
                 <div className="h-px bg-zinc-100" />
                 <div className="flex flex-col gap-0.5">
-                  <p className="font-semibold text-zinc-700">Pro</p>
+                  <p className="font-semibold text-zinc-700">Pro <span className="font-normal text-zinc-400">· $5.00 USDC</span></p>
                   <p className="text-zinc-400">Full pipeline · tamper-proof stamp on Base · ENS subname registration</p>
                 </div>
               </div>

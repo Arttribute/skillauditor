@@ -26,7 +26,7 @@ export default async function Home() {
 
       <main className="flex flex-col flex-1">
         {/* ── Hero ── */}
-        <section className="px-8 pt-24 pb-20 border-b border-zinc-100">
+        <section className="px-8 pt-24 pb-24 border-b border-zinc-100">
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left: headline + CTAs */}
             <div className="flex flex-col gap-8">
@@ -71,6 +71,14 @@ export default async function Home() {
 
             {/* Right: threat list card with colored header */}
             <div className="rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-3 bg-[#0052ff] flex items-center justify-between">
+                <span className="text-xs font-semibold text-white uppercase tracking-widest">
+                  Threat vectors
+                </span>
+                <span className="text-xs text-blue-50">
+                  detected by SkillAuditor
+                </span>
+              </div>
               <div className="flex flex-col divide-y divide-zinc-100">
                 {[
                   {
@@ -207,12 +215,6 @@ export default async function Home() {
                 read and act on.
               </p>
               <div className="flex flex-col gap-2.5 text-sm text-zinc-600">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-50">
-                    <span className="h-2 w-2 rounded-full bg-orange-500" />
-                  </span>
-                  REST API &amp; CLI
-                </div>
                 <div className="flex items-center gap-3">
                   <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-yellow-50">
                     <span className="h-2 w-2 rounded-full bg-yellow-400" />
