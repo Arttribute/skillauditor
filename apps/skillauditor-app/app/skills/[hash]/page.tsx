@@ -79,8 +79,7 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
 
   const audit = skill.latestAuditId ? await fetchLatestAudit(skill.latestAuditId) : null
   const findings = audit?.findings ?? []
-  const shortHash = hash.slice(2, 10)
-  const ensName = skill.ensSubname ?? `${shortHash}.skills.skillauditor.eth`
+  const ensName = skill.ensSubname ?? null
 
   return (
     <div className="flex flex-1 flex-col">
@@ -200,12 +199,15 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
             {/* ENS Subname */}
             <div className="rounded-xl border border-zinc-200 p-5 flex flex-col gap-3">
               <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Identity</p>
-              <ENSNameDisplay
-                ensName={ensName}
-                etherscanUrl={skill.ensSubname ? `https://app.ens.domains/${ensName}` : undefined}
-              />
-              {!skill.ensSubname && (
-                <p className="text-xs text-zinc-300">ENS subname registered for Pro tier audits</p>
+              {ensName ? (
+                <ENSNameDisplay
+                  ensName={ensName}
+                  etherscanUrl={`https://app.ens.domains/${ensName}`}
+                />
+              ) : (
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  No ENS subname — Pro tier audits receive a registered subname on <span className="font-mono">skills.skillauditor.eth</span>.
+                </p>
               )}
             </div>
 
@@ -230,11 +232,25 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[#5b84c4] font-medium">Transaction</span>
-                    <span className="font-mono text-zinc-600 break-all">{audit.stamp.txHash}</span>
+                    <a
+                      href={`https://sepolia.basescan.org/tx/${audit.stamp.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[#0052ff] break-all hover:underline"
+                    >
+                      {audit.stamp.txHash}
+                    </a>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[#5b84c4] font-medium">Contract</span>
-                    <span className="font-mono text-zinc-600 break-all">{audit.stamp.contractAddress}</span>
+                    <a
+                      href={`https://sepolia.basescan.org/address/${audit.stamp.contractAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[#0052ff] break-all hover:underline"
+                    >
+                      {audit.stamp.contractAddress}
+                    </a>
                   </div>
                   {audit.stamp.ipfsCid && (
                     <div className="flex flex-col gap-0.5">
