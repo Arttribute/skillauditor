@@ -46,9 +46,10 @@ import {
 const WORLD_CHAIN_RPC_URL =
   process.env.WORLD_CHAIN_RPC_URL ?? 'https://worldchain-mainnet.g.alchemy.com/public'
 
-// Set to 'world-testnet' during development if using testnet AgentBook.
-const AGENTKIT_NETWORK =
-  (process.env.WORLD_AGENTKIT_NETWORK as 'world' | 'world-testnet') ?? 'world'
+// CAIP-2 chain ID for World Chain mainnet (chainId 480).
+// Use "eip155:4801" for World Chain testnet.
+const WORLD_CHAIN_ID =
+  process.env.WORLD_AGENTKIT_NETWORK === 'world-testnet' ? 'eip155:4801' : 'eip155:480'
 
 // ── Nonce replay protection (MongoDB) ────────────────────────────────────────
 // Each SIWE message includes a unique nonce. We record it on first use and
@@ -85,14 +86,11 @@ export type WorldAgentkitContext = {
 
 async function resolveAgentHumanId(walletAddress: string): Promise<string | null> {
   try {
-    const verifier = createAgentBookVerifier({ network: AGENTKIT_NETWORK })
-    // The verifier resolves a wallet address to the anonymous human identifier
-    // associated with the World ID that registered this agent in AgentBook.
-    // If the wallet is not registered the result is null/undefined.
-    const result = await (verifier as unknown as {
-      getHumanIdentifier: (addr: string) => Promise<string | null>
-    }).getHumanIdentifier(walletAddress)
-    return result ?? null
+    // createAgentBookVerifier queries the AgentBook contract on World Chain (chainId 480).
+    // It maps a registered agent wallet → the anonymous human identifier associated
+    // with the World ID that registered the agent. Returns null if not registered.
+    const verifier = createAgentBookVerifier({ rpcUrl: WORLD_CHAIN_RPC_URL })
+    return await verifier.lookupHuman(walletAddress, WORLD_CHAIN_ID)
   } catch (err) {
     console.warn('[world-agentkit] AgentBook lookup failed:', (err as Error).message)
     return null
@@ -178,9 +176,9 @@ export const worldAgentkitMiddleware = createMiddleware<WorldAgentkitContext>(as
   // ── 4. Verify wallet signature ─────────────────────────────────────────────
   // verifyAgentkitSignature reconstructs the SIWE message from the payload and
   // verifies the signature against the declared wallet address.
-  let signatureValid: boolean
+  let verifyResult: { valid: boolean; address?: string; error?: string }
   try {
-    signatureValid = await verifyAgentkitSignature(payload, WORLD_CHAIN_RPC_URL)
+    verifyResult = await verifyAgentkitSignature(payload, WORLD_CHAIN_RPC_URL)
   } catch (err) {
     return c.json(
       {
@@ -191,8 +189,14 @@ export const worldAgentkitMiddleware = createMiddleware<WorldAgentkitContext>(as
     )
   }
 
-  if (!signatureValid) {
-    return c.json({ error: 'Invalid agentkit signature' }, 401)
+  if (!verifyResult.valid) {
+    return c.json(
+      {
+        error:  'Invalid agentkit signature',
+        detail: verifyResult.error ?? 'Signature did not verify against declared wallet address',
+      },
+      401,
+    )
   }
 
   // ── 5. AgentBook lookup — wallet → human identifier ────────────────────────
