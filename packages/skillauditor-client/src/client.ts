@@ -154,21 +154,23 @@ export class SkillAuditorClient {
     }
 
     // ── Submit for audit ────────────────────────────────────────────────────────
-    const submitUrl = `${this.apiUrl}/v1/agent/submit`
-    const agentkit  = await buildAgentkitHeader(this.privateKey, submitUrl)
+    // Dev mode (no real key): use /v1/submit — no AgentKit auth required.
+    // Production (real key):  use /v1/agent/submit — SIWE + x402 payment gate.
+    const isDev      = !this.privateKey || this.privateKey === 'dev'
+    const submitUrl  = isDev
+      ? `${this.apiUrl}/v1/submit`
+      : `${this.apiUrl}/v1/agent/submit`
 
     const body = JSON.stringify({ skillContent, tier })
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (!isDev) {
+      headers['agentkit'] = await buildAgentkitHeader(this.privateKey, submitUrl)
+    }
+
     const submitRes = await fetchWithX402(
       submitUrl,
-      {
-        method:  'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'agentkit':     agentkit,
-        },
-        body,
-      },
+      { method: 'POST', headers, body },
       tier === 'pro' ? this.paymentHandler : undefined,
     )
 

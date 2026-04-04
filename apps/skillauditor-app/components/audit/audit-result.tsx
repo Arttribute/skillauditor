@@ -363,12 +363,12 @@ function FindingsPanel({ findings }: { findings: Finding[] }) {
   )
 
   return (
-    <div className="rounded-xl border border-zinc-200 p-6 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-900">Findings</h2>
+    <div className="rounded-xl border border-zinc-200 overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-100 bg-white">
+        <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Findings</h2>
         <span className="text-xs text-zinc-400">{findings.length} finding{findings.length !== 1 ? 's' : ''}</span>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="overflow-y-auto max-h-[420px] flex flex-col gap-2 p-4">
         {sorted.map((f, i) => <FindingRow key={i} finding={f} />)}
       </div>
     </div>
