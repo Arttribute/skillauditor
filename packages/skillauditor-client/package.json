@@ -1,6 +1,6 @@
 {
   "name": "@skillauditor/client",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Agent SDK for SkillAuditor — submit, verify, and check skills onchain in one call",
   "type": "module",
   "license": "MIT",
