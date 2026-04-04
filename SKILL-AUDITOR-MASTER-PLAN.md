@@ -22,19 +22,34 @@ SkillAuditor is a security auditing and verification service for Claude skills (
 | Live pipeline polling with stage indicators | ✅ Complete |
 | Full result display: verdict, score, dimensions, findings, evidence | ✅ Complete |
 | Audit history (localStorage, live verdict per entry) | ✅ Complete |
+| `SkillRegistry.sol` on Base Sepolia — real onchain stamps | ✅ `0x87C3E6C452585806Ef603a9501eb74Ce740Cafcc` |
+| Real World ID 4.0 verification (dev bypass + live API) | ✅ Complete |
+| ENS subname registration (`packages/skill-ens/`) | ✅ Complete |
+| `skillauditor.eth` registered + `skills.skillauditor.eth` subnode | ✅ Ethereum Sepolia |
+| `SkillSubnameRegistrar.sol` deployed to Ethereum Sepolia | ✅ `0x83466a77A8EeE107083876a311EC0700c3cC8453` |
+| World AgentKit SIWE session (agent verification middleware) | ✅ `/v1/agent/submit` |
+| `@skillauditor/client` SDK — verifySkill(), isSafe(), polling, logging | ✅ `packages/skillauditor-client/` |
+| Ledger ERC-7730 Clear Signing file for `SkillRegistry.sol` | ✅ `contracts/erc7730/SkillRegistry.json` |
+| Ledger DMK browser components (connect, status, approve modal) | ✅ Wired on skill detail page |
+| Pro/Free tier selector in submit form | ✅ Complete |
 
-### What is next (ordered by hackathon impact)
+### Still to activate (requires prod env vars)
 
-| Priority | Capability | Bounty |
-|----------|-----------|--------|
-| 1 | `SkillRegistry.sol` deployed to Base Sepolia + real onchain stamp | ENS + Ledger |
-| 2 | Real World ID verification (`services/world-id.ts`) | World ID $8k |
-| 3 | ENS subname registration (`packages/skill-ens/`) | ENS $10k |
-| 4 | World AgentKit session (`services/agentkit-session.ts`) | AgentKit $8k |
-| 5 | IPFS report upload (`services/ipfs.ts`) | All bounties |
-| 6 | Ledger ERC-7730 file + DMK browser component | Ledger $6k |
-| 7 | Public explore page + skill detail page | Demo quality |
-| 8 | `@skillauditor/client` — agent SDK that hides all complexity | Adoption |
+| Item | Env Var(s) needed |
+|------|------------------|
+| Real World ID proof verification | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY` |
+| CDP AgentKit wallet for stamps | `CDP_API_KEY_NAME`, `CDP_API_KEY_PRIVATE_KEY` |
+| x402 payment gate for Pro audits | `SKILLAUDITOR_TREASURY_ADDRESS` (non-zero) |
+| IPFS report pinning | `PINATA_JWT` |
+| ENS subname writes to Ethereum Sepolia | `AUDITOR_AGENT_PRIVATE_KEY` (non-zero) |
+
+### Post-hackathon: Base Mainnet migration
+
+On Base Mainnet, use **Basenames** (`*.base.eth`) instead of ENS Sepolia. Requires:
+1. Register `skillauditor.base.eth` via Basenames
+2. Deploy `SkillSubnameRegistrar` to Ethereum mainnet (ENS L1) or use Base-native resolver
+3. Deploy `SkillRegistry` to Base mainnet
+4. Update `SKILL_REGISTRY_CHAIN_ID=8453`, `SKILL_SUBNAME_CHAIN_ID=1`
 
 ---
 
@@ -52,7 +67,7 @@ SkillAuditor is a security auditing and verification service for Claude skills (
 |--------|-----------|-----------|
 | World: Best use of AgentKit | $8,000 | Sandbox runner is a World ID-verified AgentKit agent |
 | World: Best use of World ID 4.0 | $8,000 | World ID gates skill submission, prevents spam audits |
-| ENS: Best ENS Integration for AI Agents | $5,000 | Every skill gets `{hash}.skills.auditor.eth` ENS subname |
+| ENS: Best ENS Integration for AI Agents | $5,000 | Every skill gets `{hash}.skills.skillauditor.eth` ENS subname |
 | ENS: Most Creative Use | $5,000 | Audit verdict stored in ENS text records; agents resolve to verify |
 | Ledger: AI Agents × Ledger | $6,000 | Ledger as trust layer: hardware-approved stamps + x402 Clear Signing |
 
@@ -758,27 +773,27 @@ ERC-7730 is the 2025/2026 standard that makes Ledger show human-readable informa
 
 ## 4.1 Why ENS for Skill Identity
 
-Every audited skill gets an ENS subname: `{skill-hash-8}.skills.auditor.eth`
+Every audited skill gets an ENS subname: `{skill-hash-8}.skills.skillauditor.eth`
 
 Text records store the audit verdict — any agent can resolve the ENS name to check safety without calling our API, without us being online.
 
 **This is ENS as infrastructure, not decoration:**
-- Agent runtimes resolve `abc123de.skills.auditor.eth` → text record `verdict=safe,score=94`
+- Agent runtimes resolve `abc123de.skills.skillauditor.eth` → text record `verdict=safe,score=94`
 - No API key needed. No rate limit. Works even if SkillAuditor goes down.
 - Decentralised verification layer that outlasts any company
 
 ## 4.2 Subname Registry Architecture
 
 ```
-auditor.eth  (ENS 2LD, owned by SkillAuditor Safe multisig)
-    └── skills.auditor.eth  (subdomain, points to SubnameRegistrar contract)
-            └── abc123de.skills.auditor.eth  (per-skill, auto-registered on audit)
-            └── f4e21a99.skills.auditor.eth
+skillauditor.eth  (ENS 2LD, registered 2026-04-04 on Ethereum Sepolia)
+    └── skills.skillauditor.eth  (subdomain, points to SubnameRegistrar contract)
+            └── abc123de.skills.skillauditor.eth  (per-skill, auto-registered on audit)
+            └── f4e21a99.skills.skillauditor.eth
             └── ...
 
-auditors.auditor.eth  (auditor agent subnames)
-    └── agent-0x1234.auditors.auditor.eth
-    └── agent-0xabcd.auditors.auditor.eth
+auditors.skillauditor.eth  (auditor agent subnames)
+    └── agent-0x1234.auditors.skillauditor.eth
+    └── agent-0xabcd.auditors.skillauditor.eth
 ```
 
 **Technical implementation on Base (L2 subnames):**
@@ -793,7 +808,7 @@ import { addEnsContracts, getEnsText, setEnsText } from '@ensdomains/ensjs';
 // Read audit verdict from ENS text records
 async function getSkillVerdict(skillHash: string): Promise<string | null> {
   const shortHash = skillHash.slice(2, 10); // 8 hex chars
-  const ensName = `${shortHash}.skills.auditor.eth`;
+  const ensName = `${shortHash}.skills.skillauditor.eth`;
 
   const client = createPublicClient({
     chain: addEnsContracts(mainnet),
@@ -812,7 +827,7 @@ async function getSkillVerdict(skillHash: string): Promise<string | null> {
 // "score" → "94"
 // "report" → "ipfs://Qm..."
 // "audited_at" → "1742000000"
-// "auditor" → "agent-0x1234.auditors.auditor.eth"
+// "auditor" → "agent-0x1234.auditors.skillauditor.eth"
 // "skill_name" → "pdf-reader"
 // "version" → "1.0.0"
 ```
@@ -821,7 +836,7 @@ async function getSkillVerdict(skillHash: string): Promise<string | null> {
 ```solidity
 contract SkillSubnameRegistrar {
     ENS public ens;
-    bytes32 public rootNode; // namehash("skills.auditor.eth")
+    bytes32 public rootNode; // namehash("skills.skillauditor.eth")
     address public skillRegistry;
 
     function registerSkillSubname(
@@ -843,8 +858,8 @@ contract SkillSubnameRegistrar {
 
 ## 4.3 Auditor Agent ENS Names
 
-Each AgentKit audit agent gets an ENS subname under `auditors.auditor.eth`:
-- Name: `agent-{cdpWalletAddress8}.auditors.auditor.eth`
+Each AgentKit audit agent gets an ENS subname under `auditors.skillauditor.eth`:
+- Name: `agent-{cdpWalletAddress8}.auditors.skillauditor.eth`
 - Text records: `world_id_verification_level`, `total_audits`, `trust_score`, `specialization`
 
 This satisfies the **ENS AI Agents bounty** — ENS as the identity layer for a fleet of audit agents, with metadata stored in text records, allowing agent discovery.
@@ -1163,7 +1178,7 @@ export interface OnchainStamp {
   txHash: string;
   chainId: number;
   contractAddress: string;
-  ensSubname: string;        // e.g. "abc123de.skills.auditor.eth"
+  ensSubname: string;        // e.g. "abc123de.skills.skillauditor.eth"
   ipfsCid: string;           // full report CID
 }
 ```
@@ -1222,7 +1237,7 @@ ENS integration for skill identity.
 ```typescript
 export class SkillENS {
   constructor(private config: {
-    rootDomain: string;              // "skills.auditor.eth"
+    rootDomain: string;              // "skills.skillauditor.eth"
     subnameRegistrar: Address;
     walletClient?: WalletClient;
   }) {}
@@ -1527,7 +1542,7 @@ packages/skillauditor-client/
 ### 1.1 Production Onchain Deploy
 - [ ] Deploy `SkillRegistry.sol` to Base mainnet
 - [ ] Deploy `SkillSubnameRegistrar` to Base mainnet
-- [ ] Register `auditor.eth` ENS name
+- [x] Register `skillauditor.eth` ENS name (done 2026-04-04)
 - [ ] Setup Safe 2-of-3 multisig as owner
 
 ### 1.2 Real Sandbox Isolation (GCP Cloud Functions)
@@ -1603,7 +1618,7 @@ packages/skillauditor-client/
    - Dashboard shows pending Ledger approval: "AgentKit wants to call recordStamp() — Verdict: SAFE — Score: 94"
    - Ledger screen: Clear Signed `recordStamp()` call with verdict/score human-readable
    - User presses ✓ → stamp written onchain → ENS subname registered
-9. **Show ENS:** `abc123de.skills.auditor.eth` → text record `verdict=safe,score=94`
+9. **Show ENS:** `abc123de.skills.skillauditor.eth` → text record `verdict=safe,score=94`
 10. **Show Base Sepolia:** SkillRegistry `SkillAudited` event
 
 **Key talking points:**
@@ -1657,7 +1672,7 @@ packages/skillauditor-client/
 | MongoDB Atlas | Audit record storage | Yes |
 | Pinata | IPFS report storage | Yes |
 | Alchemy / Infura | Base + Ethereum RPC | Yes (Base + ENS) |
-| ENS (registrar) | `auditor.eth` name + subnames | Yes (ENS bounty) |
+| ENS (registrar) | `skillauditor.eth` + `skills.skillauditor.eth` subnames | Yes (ENS bounty) |
 | GCP Cloud Run | API hosting | Yes |
 | Vercel | App hosting | Yes |
 | Privy | User auth | Yes |
@@ -1678,7 +1693,7 @@ WORLD_APP_SECRET=...
 BASE_RPC_URL=https://mainnet.base.org
 SKILL_REGISTRY_ADDRESS=0x...
 SKILL_SUBNAME_REGISTRAR_ADDRESS=0x...
-ENS_ROOT_DOMAIN=skills.auditor.eth
+ENS_ROOT_DOMAIN=skills.skillauditor.eth
 CDP_API_KEY_NAME=...
 CDP_API_KEY_PRIVATE_KEY=...
 AUDITOR_WALLET_PRIVATE_KEY=...  # Base wallet for writing stamps

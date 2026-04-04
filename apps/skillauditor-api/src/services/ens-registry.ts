@@ -1,10 +1,13 @@
 /**
  * ENS registry service — implements IENSRegistry using @skillauditor/skill-ens.
  *
- * When SKILL_SUBNAME_REGISTRAR_ADDRESS is configured, subname registration
- * and resolution is fully on-chain.  When the variable is absent (ENS not yet
- * deployed — see BRANCH-PLAN-onchain-identity.md Blocker 1) the service falls
- * back to returning deterministically-derived ENS names without on-chain writes.
+ * SkillSubnameRegistrar is deployed on Ethereum Sepolia (chain 11155111) where
+ * real ENS lives. SkillRegistry is on Base Sepolia (84532). The API talks to
+ * both chains independently — stamps go to Base, ENS subnames go to Eth Sepolia.
+ *
+ * When SKILL_SUBNAME_REGISTRAR_ADDRESS is not configured, the service falls back
+ * to returning deterministically-derived stub ENS names without on-chain writes
+ * so the rest of the pipeline keeps running.
  */
 
 import { SkillENSClient } from '@skillauditor/skill-ens'
@@ -12,20 +15,25 @@ import type { IENSRegistry, VerdictData, ENSAuditRecord, AuditorMetadata } from 
 import type { Hex, Address } from 'viem'
 
 function getConfig() {
-  const chainId    = Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532')
-  const rpcUrl     = chainId === 8453
-    ? (process.env.BASE_MAINNET_RPC_URL ?? 'https://mainnet.base.org')
-    : (process.env.BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org')
+  // ENS runs on Ethereum Sepolia (11155111) — separate from Base Sepolia (84532)
+  // where SkillRegistry lives. Use SKILL_SUBNAME_CHAIN_ID to override.
+  const chainId = Number(process.env.SKILL_SUBNAME_CHAIN_ID ?? '11155111')
+
+  const rpcUrl = chainId === 1
+    ? (process.env.ETH_MAINNET_RPC_URL ?? 'https://eth.llamarpc.com')
+    : (process.env.ETH_SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com')
 
   const registrarAddress = (process.env.SKILL_SUBNAME_REGISTRAR_ADDRESS ?? '') as Address | ''
-  const resolverAddress  = (process.env.ENS_RESOLVER_ADDRESS ?? '') as Address | ''
-  const privateKey       = (process.env.AUDITOR_AGENT_PRIVATE_KEY ?? '') as Hex | ''
+  const resolverAddress  = (process.env.ENS_RESOLVER_ADDRESS             ?? '') as Address | ''
+  const rootNode         = (process.env.ENS_ROOT_NODE                    ?? '') as Hex     | ''
+  const privateKey       = (process.env.AUDITOR_AGENT_PRIVATE_KEY        ?? '') as Hex     | ''
 
   return {
     chainId,
     rpcUrl,
     registrarAddress: registrarAddress || null,
     resolverAddress:  resolverAddress  || null,
+    rootNode:         rootNode         || null,
     privateKey:       privateKey       || null,
   }
 }

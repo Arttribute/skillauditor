@@ -130,7 +130,7 @@
           },
           {
             "path":   "ensNode",
-            "label":  "ENS Node (skills.auditor.eth subname)",
+            "label":  "ENS Node (skills.skillauditor.eth subname)",
             "format": "raw"
           }
         ],
