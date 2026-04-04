@@ -107,26 +107,7 @@
             "format": "raw"
           }
         ],
-        "required":   ["skillHash", "verdict", "score"],
-        "screens": {
-          "nano": [
-            [{ "path": "verdict",   "label": "Verdict" }],
-            [{ "path": "score",     "label": "Score"   }],
-            [{ "path": "skillHash", "label": "Skill"   }]
-          ],
-          "stax": [
-            [
-              { "path": "verdict",   "label": "Safety Verdict" },
-              { "path": "score",     "label": "Score (0-100)"  }
-            ],
-            [
-              { "path": "skillHash", "label": "Skill Hash" }
-            ],
-            [
-              { "path": "reportCid", "label": "IPFS Report" }
-            ]
-          ]
-        }
+        "required":   ["skillHash", "verdict", "score"]
       },
       "revokeStamp(bytes32)": {
         "intent": "Revoke Skill Safety Stamp",

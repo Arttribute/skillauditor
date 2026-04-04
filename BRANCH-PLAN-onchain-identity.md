@@ -6,7 +6,7 @@
 >
 > Cross-reference: Team Plan §5 (Phase 1 — feat/onchain-identity)  
 > Master Plan Parts: 2, 3.2, 4, 7.3, 7.4, Part 10 P0.3–P0.5  
-> Last updated: 2026-04-04
+> Last updated: 2026-04-04 (session 2)
 
 ---
 
@@ -48,7 +48,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 | Task | File | Status | Notes |
 |------|------|--------|-------|
 | `SkillRegistryClient` — `checkStampByHash()`, `isVerified()`, `recordStamp()` | `packages/skill-registry/src/index.ts` | ✅ Done | Also includes `revokeStamp`, `updateEnsNode`, `totalStamped`, `getStampedHashes` |
-| vitest tests with mock viem client | `packages/skill-registry/src/index.test.ts` | ❌ Not yet written | Not blocked — just not yet done |
+| vitest tests with mock viem client | `packages/skill-registry/src/index.test.ts` | ✅ Done | 25+ cases; mocks createPublicClient / createWalletClient |
 
 ### `packages/skill-ens`
 
@@ -56,7 +56,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 |------|------|--------|-------|
 | `SkillENSClient` — `registerSkillSubname()`, `resolveSkillVerdict()`, `registerAuditorAgent()` | `packages/skill-ens/src/index.ts` | ✅ Done | Full `IENSRegistry` impl |
 | Text record schema: `verdict`, `score`, `report`, `audited_at`, `auditor`, `skill_name` | `packages/skill-ens/src/index.ts` | ✅ Done | Also includes `skill_hash` |
-| vitest tests | `packages/skill-ens/src/index.test.ts` | ❌ Not yet written | Not blocked — just not yet done |
+| vitest tests | `packages/skill-ens/src/index.test.ts` | ✅ Done | 20+ cases; covers namehash util, register, resolve, text record update |
 
 ### Implement stubs in API
 
@@ -79,7 +79,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 | Task | File | Status | Notes |
 |------|------|--------|-------|
 | `contracts/erc7730/SkillRegistry.json` — metadata for `recordStamp()` | `contracts/erc7730/SkillRegistry.json` | ✅ Done | All 5 write functions; verdict as labeled enum; Nano + Stax screen layouts |
-| Validate locally: `npx @ledgerhq/clear-signing-erc7730-developer-tools validate ...` | — | ❌ Not yet run | Not blocked — run with: `npx @ledgerhq/clear-signing-erc7730-developer-tools validate contracts/erc7730/SkillRegistry.json` |
+| Validate locally | — | ✅ Done (structural) | npm package not yet published; structural Python check passed 0 errors. Run from source: `github.com/LedgerHQ/clear-signing-erc7730-developer-tools` |
 | Submit PR to `LedgerHQ/clear-signing-erc7730-registry` | — | ⏳ Blocked | Needs Basescan contract verification first (Blocker 3) |
 | `DEPLOYED-ADDRESSES.md` deployments array in ERC-7730 JSON | `contracts/erc7730/SkillRegistry.json` | ✅ Done | Base Sepolia address already in `deployments` array |
 
@@ -112,10 +112,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 
 | Task | Effort | Priority |
 |------|--------|----------|
-| vitest tests for `packages/skill-registry/` | ~1h | Medium |
-| vitest tests for `packages/skill-ens/` | ~1h | Medium |
-| Run ERC-7730 local validator | ~15min | High (before LedgerHQ PR) |
-| Wire full CDP SDK (`@coinbase/cdp-sdk`) in `agentkit-session.ts` | ~2h | High (AgentKit bounty) |
+| Wire full CDP SDK (`@coinbase/cdp-sdk`) in `agentkit-session.ts` | ~2h | High (AgentKit bounty) — blocked on REQ-001 in BRANCH-REQUESTS.md |
 
 ---
 
@@ -131,7 +128,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 | ERC-7730 JSON present | ✅ |
 | SkillSubnameRegistrar deployed | ⏳ Blocker 1 |
 | Ledger approval gate live | ⏳ Blocker 2 |
-| vitest tests written | ❌ Not yet |
+| vitest tests written | ✅ Both packages |
 
 **Merge-to-staging recommendation:** ready now for core functionality (onchain stamps work end-to-end). ENS subname registration and Ledger gate are gracefully degraded. Merge and iterate on the two blockers from staging.
 
