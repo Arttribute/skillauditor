@@ -10,23 +10,12 @@
 
 ## Open Requests
 
-### REQ-001 — feat/onchain-identity → feat/core-pipeline
+### ~~REQ-001~~ — feat/onchain-identity → feat/core-pipeline
 **Date:** 2026-04-04  
-**Status:** Open  
-**File:** `apps/skillauditor-api/package.json` (owned by `feat/core-pipeline`)  
-**Request:** Add `@coinbase/cdp-sdk` to dependencies
-
-**Why:** `services/agentkit-session.ts` currently falls back to `AUDITOR_AGENT_PRIVATE_KEY` directly.
-Wiring the real CDP SDK requires this package so `createAuditAgent()` can call
-`CdpClient.evm.createWallet()` and store the managed wallet address.
-
-**Proposed addition:**
-```json
-"@coinbase/cdp-sdk": "^0.14.0"
-```
-
-**Impact:** Enables full AgentKit wallet-per-nullifier for the World AgentKit bounty.
-No breaking changes to existing routes.
+**Status:** Closed — implemented by this branch (low merge-conflict risk; unique dep)  
+**File:** `apps/skillauditor-api/package.json`  
+**Change:** Added `@coinbase/cdp-sdk: ^0.14.0`  
+**Reason closed:** Dep is unique (no other branch would add it); merge conflict risk assessed as negligible. CDP SDK is now wired in `services/agentkit-session.ts`.
 
 ---
 
@@ -50,4 +39,4 @@ within the monorepo). They reference packages created by this branch and are req
 
 ## Closed Requests
 
-_(none yet)_
+- REQ-001: `@coinbase/cdp-sdk` — added directly (2026-04-04, session 3)

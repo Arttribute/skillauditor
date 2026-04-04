@@ -5,58 +5,65 @@
  * World ID nullifier.  Each wallet is the signing key for all onchain actions
  * taken on behalf of a verified human submitter.
  *
- * Two actions are exposed:
+ * Wallet resolution strategy (in priority order):
+ *   1. CDP managed wallet  — when CDP_API_KEY_NAME + CDP_API_KEY_PRIVATE_KEY are set.
+ *                            Each nullifier gets its own server-managed EOA on Base.
+ *                            Address is stored in MongoDB for retrieval on subsequent calls.
+ *   2. Dev key fallback    — AUDITOR_AGENT_PRIVATE_KEY used for all nullifiers.
+ *                            Sufficient for local dev and initial hackathon demo.
  *
- *   writeRegistryStampAction  — calls /v1/ledger/propose, waits for Ledger
- *                               hardware approval, then broadcasts recordStamp()
- *
- *   registerENSSubnameAction  — same Ledger approval gate, then calls
- *                               SkillSubnameRegistrar.registerSubname()
+ * Transaction broadcast strategy (mirrors wallet resolution):
+ *   1. CDP sendTransaction — when CDP credentials present. CDP manages gas, nonces, retries.
+ *   2. viem writeContract  — falls back to AUDITOR_AGENT_PRIVATE_KEY via onchainRegistry.
  *
  * Ledger approval gate
  * ─────────────────────
- * Before broadcasting any onchain write the agent creates a LedgerApproval
- * document in MongoDB and returns without acting.  The frontend shows the
- * user a Ledger DMK modal; when the user approves, the frontend POSTs the
- * signature to /v1/ledger/approve/:id.  This service polls until approved.
+ * Before broadcasting, the agent proposes a LedgerApproval document and waits for the
+ * frontend to collect a Ledger hardware signature.  While /v1/ledger/* routes return 501
+ * (feat/core-pipeline owns them) the gate is bypassed with a warning.
+ * See BRANCH-PLAN-onchain-identity.md Blocker 2.
  *
- * NOTE: The /v1/ledger/* routes currently return 501 (owned by feat/core-pipeline).
- *       Until those routes are live the gate is bypassed and a warning is logged.
- *       See BRANCH-PLAN-onchain-identity.md Blocker 2.
+ * Step 4 — swap auditorAgent
+ * ──────────────────────────
+ * Once a CDP wallet address is confirmed, call:
+ *   SkillRegistry.setAuditorAgent(cdpWalletAddress)
+ * from the owner EOA to make CDP the authorised signer for all future stamps.
  */
 
-import mongoose from 'mongoose'
+import mongoose   from 'mongoose'
+import { CdpClient } from '@coinbase/cdp-sdk'
+import { encodeFunctionData, type Address, type Hex } from 'viem'
 import { onchainRegistry } from './onchain-registry.js'
 import { ensRegistry }     from './ens-registry.js'
+import { SKILL_REGISTRY_ABI } from '@skillauditor/skill-registry'
 import type { RecordStampParams, VerdictData } from '@skillauditor/skill-types'
 
-// ── MongoDB model — CDP wallets persisted by nullifier ────────────────────────
+// ── MongoDB model ─────────────────────────────────────────────────────────────
 
 const cdpWalletSchema = new mongoose.Schema({
-  nullifier:    { type: String, required: true, unique: true, index: true },
-  walletId:     { type: String, required: true },
-  address:      { type: String, required: true },
-  network:      { type: String, default: 'base-sepolia' },
-  /** Serialised wallet seed / export from CDP SDK — encrypted at rest in prod. */
-  walletExport: { type: String, required: false },
-  createdAt:    { type: Date,   default: Date.now },
-  updatedAt:    { type: Date,   default: Date.now },
+  nullifier:  { type: String, required: true, unique: true, index: true },
+  walletId:   { type: String, required: true },   // CDP account name
+  address:    { type: String, required: true },   // 0x-prefixed EOA address
+  network:    { type: String, default: 'base-sepolia' },
+  mode:       { type: String, enum: ['cdp', 'dev'], default: 'dev' },
+  createdAt:  { type: Date, default: Date.now },
+  updatedAt:  { type: Date, default: Date.now },
 })
 
-const CdpWallet = mongoose.models['CdpWallet'] ??
+const CdpWalletModel = mongoose.models['CdpWallet'] ??
   mongoose.model('CdpWallet', cdpWalletSchema)
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface StampActionParams {
-  skillHash:    string
-  verdict:      'safe' | 'review_required' | 'unsafe'
-  score:        number
-  reportCid:    string
-  nullifier:    string
-  ensSubname:   string
-  skillName?:   string
-  auditedAt?:   number
+  skillHash:   string
+  verdict:     'safe' | 'review_required' | 'unsafe'
+  score:       number
+  reportCid:   string
+  nullifier:   string
+  ensSubname:  string
+  skillName?:  string
+  auditedAt?:  number
 }
 
 export interface ENSActionParams {
@@ -66,20 +73,55 @@ export interface ENSActionParams {
 }
 
 export interface AuditAgent {
-  walletAddress:              string
-  nullifier:                  string
-  writeRegistryStampAction:   (params: StampActionParams)  => Promise<{ txHash: string }>
-  registerENSSubnameAction:   (params: ENSActionParams)    => Promise<{ ensName: string }>
+  walletAddress:            string
+  nullifier:                string
+  mode:                     'cdp' | 'dev'
+  writeRegistryStampAction: (params: StampActionParams) => Promise<{ txHash: string }>
+  registerENSSubnameAction: (params: ENSActionParams)   => Promise<{ ensName: string }>
 }
 
-// ── Ledger approval helpers ───────────────────────────────────────────────────
+// ── Config helpers ────────────────────────────────────────────────────────────
 
-const LEDGER_API_BASE = process.env.LEDGER_API_BASE ?? 'http://localhost:3001/v1/ledger'
-const LEDGER_POLL_MS  = 3_000
-const LEDGER_TIMEOUT_MS = 5 * 60_000 // 5 min
+function cdpCredentials(): { apiKeyId: string; apiKeySecret: string } | null {
+  const apiKeyId     = process.env.CDP_API_KEY_NAME
+  const apiKeySecret = process.env.CDP_API_KEY_PRIVATE_KEY
+  if (!apiKeyId || !apiKeySecret) return null
+  return { apiKeyId, apiKeySecret }
+}
+
+function cdpNetworkId(): string {
+  return Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532') === 8453
+    ? 'base-mainnet'
+    : 'base-sepolia'
+}
+
+function contractAddress(): Address {
+  return (process.env.SKILL_REGISTRY_ADDRESS ?? '') as Address
+}
+
+// ── CDP client factory ────────────────────────────────────────────────────────
+
+function makeCdpClient(creds: { apiKeyId: string; apiKeySecret: string }): CdpClient {
+  return new CdpClient({
+    apiKeyId:     creds.apiKeyId,
+    apiKeySecret: creds.apiKeySecret,
+  })
+}
+
+// ── Verdict mapping (string → uint8 for ABI encoding) ────────────────────────
+
+const VERDICT_TO_UINT8: Record<string, number> = {
+  unsafe: 0, review_required: 1, safe: 2,
+}
+
+// ── Ledger approval gate ──────────────────────────────────────────────────────
+
+const LEDGER_API_BASE   = process.env.LEDGER_API_BASE ?? 'http://localhost:3001/v1/ledger'
+const LEDGER_POLL_MS    = 3_000
+const LEDGER_TIMEOUT_MS = 5 * 60_000
 
 async function proposeLedgerApproval(payload: {
-  actionType: string
+  actionType:      string
   transactionData: Record<string, unknown>
 }): Promise<string | null> {
   try {
@@ -89,40 +131,33 @@ async function proposeLedgerApproval(payload: {
       body:    JSON.stringify(payload),
     })
     if (resp.status === 501) {
-      console.warn('[agentkit] /v1/ledger/propose returns 501 — Ledger routes not yet live (Blocker 2). Bypassing approval gate.')
-      return null   // null signals: gate bypassed, proceed directly
+      console.warn('[agentkit] /v1/ledger/propose → 501 (routes not yet live, Blocker 2) — bypassing gate')
+      return null
     }
-    if (!resp.ok) throw new Error(`ledger/propose error: ${resp.status}`)
-    const data = await resp.json() as { approvalId: string }
-    return data.approvalId
+    if (!resp.ok) throw new Error(`ledger/propose ${resp.status}`)
+    return ((await resp.json()) as { approvalId: string }).approvalId
   } catch (err) {
-    console.warn('[agentkit] proposeLedgerApproval failed — bypassing:', err)
+    console.warn('[agentkit] proposeLedgerApproval failed — bypassing:', (err as Error).message)
     return null
   }
 }
 
 async function pollLedgerApproval(approvalId: string): Promise<boolean> {
   const deadline = Date.now() + LEDGER_TIMEOUT_MS
-
   while (Date.now() < deadline) {
     try {
       const resp = await fetch(`${LEDGER_API_BASE}/pending/${approvalId}`)
-      if (resp.status === 501) {
-        console.warn('[agentkit] /v1/ledger/pending returns 501 — Ledger routes not live. Bypassing.')
-        return true
-      }
+      if (resp.status === 501) return true   // bypass
       if (resp.ok) {
-        const data = await resp.json() as { status: string }
-        if (data.status === 'approved') return true
-        if (data.status === 'rejected') return false
+        const { status } = (await resp.json()) as { status: string }
+        if (status === 'approved') return true
+        if (status === 'rejected') return false
       }
-    } catch { /* ignore transient fetch errors */ }
-
-    await new Promise(resolve => setTimeout(resolve, LEDGER_POLL_MS))
+    } catch { /* ignore transient errors */ }
+    await new Promise(r => setTimeout(r, LEDGER_POLL_MS))
   }
-
-  console.warn('[agentkit] Ledger approval timed out — bypassing for hackathon demo')
-  return true // For demo: timeout treated as approved
+  console.warn('[agentkit] Ledger approval timed out — bypassing for demo')
+  return true
 }
 
 async function ledgerApprovalGate(
@@ -130,113 +165,183 @@ async function ledgerApprovalGate(
   transactionData: Record<string, unknown>,
 ): Promise<void> {
   const approvalId = await proposeLedgerApproval({ actionType, transactionData })
+  if (approvalId === null) return   // gate bypassed
 
-  if (approvalId === null) {
-    // Gate bypassed (routes not live or fetch failed)
-    return
-  }
-
-  console.log(`[agentkit] Waiting for Ledger approval: ${approvalId}`)
+  console.log(`[agentkit] awaiting Ledger approval: ${approvalId}`)
   const approved = await pollLedgerApproval(approvalId)
-  if (!approved) {
-    throw new Error(`Ledger approval rejected for action ${actionType} (id: ${approvalId})`)
-  }
-  console.log(`[agentkit] Ledger approval received: ${approvalId}`)
+  if (!approved) throw new Error(`Ledger approval rejected: ${actionType} (${approvalId})`)
+  console.log(`[agentkit] Ledger approved: ${approvalId}`)
 }
 
-// ── CDP wallet management ─────────────────────────────────────────────────────
+// ── CDP transaction broadcast ─────────────────────────────────────────────────
 
 /**
- * Resolve or create a CDP wallet for the given World ID nullifier.
- *
- * In a full CDP integration this calls `@coinbase/cdp-sdk` to create/import a
- * managed wallet.  For the hackathon we derive the address from the API private
- * key directly (the same key registered as auditorAgent in SkillRegistry).
- *
- * Step 4 in the SkillRegistry modular extension path:
- *   setAuditorAgent(agentKitWalletAddress) to swap the dev key for the CDP wallet.
+ * Broadcast recordStamp() via CDP managed wallet.
+ * CDP handles gas estimation, nonce management, and retry on transient failures.
  */
-async function resolveOrCreateWallet(nullifier: string): Promise<{ address: string; walletId: string }> {
-  const existing = await CdpWallet.findOne({ nullifier }).lean()
-  if (existing) {
-    return { address: existing.address as string, walletId: existing.walletId as string }
-  }
+async function broadcastRecordStampViaCdp(
+  creds:    { apiKeyId: string; apiKeySecret: string },
+  walletAddress: string,
+  params: {
+    skillHash: string
+    verdict:   'safe' | 'review_required' | 'unsafe'
+    score:     number
+    reportCid: string
+  },
+): Promise<string> {
+  const verdictUint = VERDICT_TO_UINT8[params.verdict]
+  if (verdictUint === undefined) throw new Error(`Unknown verdict: ${params.verdict}`)
 
-  // ── CDP SDK integration ────────────────────────────────────────────────────
-  // When @coinbase/cdp-sdk is installed and credentials are set:
-  //
-  //   import { CdpClient } from '@coinbase/cdp-sdk'
-  //   const cdp    = new CdpClient({ apiKeyName: ..., apiKeyPrivateKey: ... })
-  //   const wallet = await cdp.evm.createWallet({ networkId: 'base-sepolia' })
-  //   await CdpWallet.create({ nullifier, walletId: wallet.id, address: wallet.defaultAddress.id })
-  //   return { address: wallet.defaultAddress.id, walletId: wallet.id }
-  //
-  // For now, fall back to the configured AUDITOR_AGENT_PRIVATE_KEY address:
+  const skillHashBytes32 = params.skillHash as Hex
+  const reportCidBytes32 = params.reportCid
+    ? (params.reportCid.startsWith('0x1220')
+        ? (`0x${params.reportCid.slice(6)}` as Hex)
+        : (`0x${'00'.repeat(32)}` as Hex))
+    : (`0x${'00'.repeat(32)}` as Hex)
+  const scoreUint = Math.max(0, Math.min(100, Math.round(params.score)))
 
-  const { createWalletClient, http } = await import('viem')
-  const { privateKeyToAccount }       = await import('viem/accounts')
-  const { baseSepolia }               = await import('viem/chains')
+  const data = encodeFunctionData({
+    abi:          SKILL_REGISTRY_ABI,
+    functionName: 'recordStamp',
+    args:         [skillHashBytes32, verdictUint, scoreUint, reportCidBytes32],
+  })
 
-  const pk = (process.env.AUDITOR_AGENT_PRIVATE_KEY ?? '') as `0x${string}`
-  if (!pk) {
-    throw new Error('AUDITOR_AGENT_PRIVATE_KEY not set — cannot create agentkit session')
-  }
-  const account  = privateKeyToAccount(pk)
-  const walletId = `dev-${nullifier.slice(0, 16)}`
-  const address  = account.address
+  const cdp = makeCdpClient(creds)
+  const { transactionHash } = await cdp.evm.sendTransaction({
+    address:     walletAddress as Address,
+    network:     cdpNetworkId(),
+    transaction: { to: contractAddress(), data },
+  })
 
-  await CdpWallet.create({ nullifier, walletId, address })
-  console.log(`[agentkit] created session wallet for nullifier ${nullifier.slice(0, 16)}…  address=${address}`)
-  return { address, walletId }
+  console.log(`[agentkit] CDP recordStamp broadcast: ${transactionHash}`)
+  return transactionHash
 }
 
-// ── createAuditAgent ─────────────────────────────────────────────────────────
+// ── Wallet resolution ─────────────────────────────────────────────────────────
+
+interface WalletSession {
+  address:  string
+  walletId: string
+  mode:     'cdp' | 'dev'
+}
+
+async function resolveOrCreateWallet(nullifier: string): Promise<WalletSession> {
+  // Return cached record if available
+  const existing = await CdpWalletModel.findOne({ nullifier }).lean()
+  if (existing) {
+    return {
+      address:  existing.address as string,
+      walletId: existing.walletId as string,
+      mode:     (existing.mode ?? 'dev') as 'cdp' | 'dev',
+    }
+  }
+
+  const creds = cdpCredentials()
+
+  // ── Path 1: CDP managed wallet ────────────────────────────────────────────
+  if (creds) {
+    const walletName = `skill-auditor-${nullifier.slice(0, 24)}`
+    const cdp        = makeCdpClient(creds)
+    const account    = await cdp.evm.createAccount({ name: walletName })
+
+    await CdpWalletModel.create({
+      nullifier,
+      walletId: account.name ?? walletName,
+      address:  account.address,
+      network:  cdpNetworkId(),
+      mode:     'cdp',
+    })
+
+    console.log(
+      `[agentkit] CDP wallet created: ${account.address}` +
+      ` — nullifier=${nullifier.slice(0, 16)}…` +
+      `\n  ⚠  Run SkillRegistry.setAuditorAgent(${account.address}) from the owner EOA` +
+      ` to make this wallet the authorised signer (Step 4).`,
+    )
+    return { address: account.address, walletId: account.name ?? walletName, mode: 'cdp' }
+  }
+
+  // ── Path 2: dev key fallback ──────────────────────────────────────────────
+  const { privateKeyToAccount } = await import('viem/accounts')
+  const pk = (process.env.AUDITOR_AGENT_PRIVATE_KEY ?? '') as Hex
+  if (!pk) throw new Error('No CDP credentials and no AUDITOR_AGENT_PRIVATE_KEY — cannot create session')
+
+  const account  = privateKeyToAccount(pk)
+  const walletId = `dev-${nullifier.slice(0, 16)}`
+
+  await CdpWalletModel.create({
+    nullifier,
+    walletId,
+    address: account.address,
+    network: cdpNetworkId(),
+    mode:    'dev',
+  })
+
+  console.log(`[agentkit] dev wallet session — address=${account.address} nullifier=${nullifier.slice(0, 16)}…`)
+  return { address: account.address, walletId, mode: 'dev' }
+}
+
+// ── createAuditAgent ──────────────────────────────────────────────────────────
 
 /**
  * Create or resume an AgentKit session for the given World ID nullifier.
  *
  * @param worldIdNullifier  The nullifier hash from the World ID proof.
- *                          Used as a stable, unique key for the CDP wallet.
+ *                          Stable unique key — same human always gets the same wallet.
  */
 export async function createAuditAgent(worldIdNullifier: string): Promise<AuditAgent> {
-  const { address, walletId } = await resolveOrCreateWallet(worldIdNullifier)
-  console.log(`[agentkit] session ready — nullifier=${worldIdNullifier.slice(0, 16)}… wallet=${address}`)
+  const session = await resolveOrCreateWallet(worldIdNullifier)
+  const creds   = cdpCredentials()
+
+  console.log(
+    `[agentkit] session ready — mode=${session.mode}` +
+    ` wallet=${session.address} nullifier=${worldIdNullifier.slice(0, 16)}…`,
+  )
 
   return {
-    walletAddress: address,
+    walletAddress: session.address,
     nullifier:     worldIdNullifier,
+    mode:          session.mode,
 
-    // ── Action 1: write audit stamp to SkillRegistry ──────────────────────
+    // ── Action 1: record audit stamp ────────────────────────────────────────
 
     async writeRegistryStampAction(params: StampActionParams): Promise<{ txHash: string }> {
       await ledgerApprovalGate('writeRegistryStamp', {
         skillHash: params.skillHash,
         verdict:   params.verdict,
         score:     params.score,
-        reportCid: params.reportCid,
-        walletId,
+        walletId:  session.walletId,
       })
 
-      const result = await onchainRegistry.recordStamp({
-        skillHash:  params.skillHash,
-        verdict:    params.verdict,
-        score:      params.score,
-        reportCid:  params.reportCid,
-        ensSubname: params.ensSubname,
-        nullifier:  params.nullifier,
-      } satisfies RecordStampParams)
+      let txHash: string
 
-      console.log(`[agentkit] writeRegistryStampAction complete — txHash=${result.txHash}`)
-      return result
+      if (session.mode === 'cdp' && creds) {
+        // CDP path — managed wallet signs and broadcasts directly
+        txHash = await broadcastRecordStampViaCdp(creds, session.address, params)
+      } else {
+        // Dev path — onchainRegistry uses AUDITOR_AGENT_PRIVATE_KEY via SkillRegistryClient
+        const result = await onchainRegistry.recordStamp({
+          skillHash:  params.skillHash,
+          verdict:    params.verdict,
+          score:      params.score,
+          reportCid:  params.reportCid,
+          ensSubname: params.ensSubname,
+          nullifier:  params.nullifier,
+        } satisfies RecordStampParams)
+        txHash = result.txHash
+      }
+
+      console.log(`[agentkit] writeRegistryStampAction complete — txHash=${txHash}`)
+      return { txHash }
     },
 
-    // ── Action 2: register ENS subname ────────────────────────────────────
+    // ── Action 2: register ENS subname ──────────────────────────────────────
 
     async registerENSSubnameAction(params: ENSActionParams): Promise<{ ensName: string }> {
       await ledgerApprovalGate('registerENSSubname', {
         skillHash: params.skillHash,
         verdict:   params.verdictData.verdict,
-        walletId,
+        walletId:  session.walletId,
       })
 
       const ensName = await ensRegistry.registerSkillSubname(
@@ -250,4 +355,4 @@ export async function createAuditAgent(worldIdNullifier: string): Promise<AuditA
   }
 }
 
-export { CdpWallet }
+export { CdpWalletModel as CdpWallet }

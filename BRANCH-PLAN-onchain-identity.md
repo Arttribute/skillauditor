@@ -6,7 +6,7 @@
 >
 > Cross-reference: Team Plan §5 (Phase 1 — feat/onchain-identity)  
 > Master Plan Parts: 2, 3.2, 4, 7.3, 7.4, Part 10 P0.3–P0.5  
-> Last updated: 2026-04-04 (session 2)
+> Last updated: 2026-04-04 (session 3)
 
 ---
 
@@ -69,10 +69,10 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| `services/agentkit-session.ts` — `createAuditAgent(worldIdProof)`: CDP wallet + AgentKit session | `apps/skillauditor-api/src/services/agentkit-session.ts` | ✅ Done | Wallet persisted in MongoDB by nullifier; falls back to `AUDITOR_AGENT_PRIVATE_KEY` until CDP SDK wired |
+| `services/agentkit-session.ts` — `createAuditAgent(worldIdProof)`: CDP wallet + AgentKit session | `apps/skillauditor-api/src/services/agentkit-session.ts` | ✅ Done | Full CDP SDK wired: `cdp.evm.createAccount()` per nullifier, `cdp.evm.sendTransaction()` for stamps; dev-key fallback when no CDP creds |
 | `writeRegistryStampAction` — polls `ledger_approvals` until `status=approved`, broadcasts | `agentkit-session.ts` | ✅ Done / ⏳ Gate blocked | Action implemented; gate bypasses with warning when routes return 501 (Blocker 2) |
 | `registerENSSubnameAction` — same Ledger approval gate for ENS registration | `agentkit-session.ts` | ✅ Done / ⏳ Gate blocked | Same bypass behaviour as above |
-| CDP wallet persisted in MongoDB keyed by nullifier | `agentkit-session.ts` (CdpWallet model) | ✅ Done | Mongoose model inline; full CDP SDK swap documented in code |
+| CDP wallet persisted in MongoDB keyed by nullifier | `agentkit-session.ts` (CdpWallet model) | ✅ Done | Mongoose model inline; `mode` field distinguishes `cdp` vs `dev` wallets |
 
 ### ERC-7730 Clear Signing (Ledger bounty)
 
@@ -112,7 +112,7 @@ DEPLOYED-ADDRESSES.md     ← only this branch writes here
 
 | Task | Effort | Priority |
 |------|--------|----------|
-| Wire full CDP SDK (`@coinbase/cdp-sdk`) in `agentkit-session.ts` | ~2h | High (AgentKit bounty) — blocked on REQ-001 in BRANCH-REQUESTS.md |
+| ~~Wire full CDP SDK~~ | — | ✅ Done — CDP SDK wired (session 3) |
 
 ---
 
