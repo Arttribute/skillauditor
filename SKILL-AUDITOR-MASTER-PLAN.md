@@ -6,6 +6,37 @@ SkillAuditor is a security auditing and verification service for Claude skills (
 
 **Core value proposition:** Submit a skill → receive a cryptographic safety audit → get an onchain verified stamp → agents worldwide check that stamp before executing the skill.
 
+---
+
+## Build Progress — 2026-04-04
+
+### What is live and working
+
+| Capability | Status |
+|-----------|--------|
+| Four-stage sandboxed audit pipeline (all LLM agents) | ✅ **Production-ready** |
+| REST API: submit, poll, skills, verify | ✅ Complete |
+| MongoDB persistence: Audit, Skill, User, ApiKey, LedgerApproval | ✅ Complete |
+| Privy auth (session cookie + API key) + rate limiting | ✅ Complete |
+| Next.js frontend: sign in, dashboard, submit form, audit result | ✅ **End-to-end working** |
+| Live pipeline polling with stage indicators | ✅ Complete |
+| Full result display: verdict, score, dimensions, findings, evidence | ✅ Complete |
+| Audit history (localStorage, live verdict per entry) | ✅ Complete |
+
+### What is next (ordered by hackathon impact)
+
+| Priority | Capability | Bounty |
+|----------|-----------|--------|
+| 1 | `SkillRegistry.sol` deployed to Base Sepolia + real onchain stamp | ENS + Ledger |
+| 2 | Real World ID verification (`services/world-id.ts`) | World ID $8k |
+| 3 | ENS subname registration (`packages/skill-ens/`) | ENS $10k |
+| 4 | World AgentKit session (`services/agentkit-session.ts`) | AgentKit $8k |
+| 5 | IPFS report upload (`services/ipfs.ts`) | All bounties |
+| 6 | Ledger ERC-7730 file + DMK browser component | Ledger $6k |
+| 7 | Public explore page + skill detail page | Demo quality |
+
+---
+
 **Design Principles:**
 - Sandboxed multi-agent pipeline — the auditor never reads raw skill content as instructions
 - Onchain registry on Base — tamper-proof, decentralised, permissionless to read

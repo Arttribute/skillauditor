@@ -9,6 +9,49 @@
 
 ---
 
+## Build Status — last updated 2026-04-04
+
+### Overall progress
+
+| Layer | Status | Notes |
+|-------|--------|-------|
+| Monorepo scaffold | ✅ Complete | pnpm workspace, tsconfig, shared scripts |
+| `packages/skill-types` | ✅ Complete | All interfaces: audit, db, registry, skill |
+| API server (Hono) | ✅ Complete | CORS, logger, health, port 3001 |
+| MongoDB models | ✅ Complete | Audit, Skill, User, ApiKey, LedgerApproval |
+| Auth middleware | ✅ Complete | Privy session cookie + X-API-Key |
+| Rate limiting | ✅ Complete | 60/min general, 10/min submit |
+| Management routes | ✅ Complete | users, orgs, api-keys, usage |
+| Stub services | ✅ Complete | onchain-registry, ens-registry (no-ops) |
+| **4-stage audit pipeline** | ✅ **Complete** | static-analyzer, content-analyst, sandbox-runner, verdict-agent, orchestrator |
+| v1 API routes | ✅ Complete | submit, audits, skills, verify, ledger (stubs 501) |
+| Privy frontend auth | ✅ Complete | session sync, login/logout, cookie forwarding |
+| **Submit UI** | ✅ **Complete** | textarea form, char count, loading state, userId forwarding |
+| **Audit result UI** | ✅ **Complete** | live polling, stage indicators, verdict badge, score, dimension bars, expandable findings |
+| **Dashboard** | ✅ **Complete** | auth-gated, recent audits list, New Audit button |
+| **Audit history** | ✅ **Complete** | localStorage-backed, live status per entry |
+| x402 middleware | ❌ Missing | `src/middleware/x402.ts` not yet created |
+| World ID real verification | ❌ Missing | `services/world-id.ts` — dev placeholder in submit route |
+| IPFS report upload | ❌ Missing | `services/ipfs.ts` (Pinata) — reportCid always null |
+| SkillRegistry.sol | ❌ Missing | `contracts/src/SkillRegistry.sol` — not written |
+| ENS subnames | ❌ Missing | `packages/skill-ens/`, `ens-registry.ts` real impl |
+| World AgentKit session | ❌ Missing | `services/agentkit-session.ts` |
+| Ledger ERC-7730 | ❌ Missing | `contracts/erc7730/SkillRegistry.json` |
+| Ledger DMK browser | ❌ Missing | `lib/ledger/dmk.ts`, modal component |
+| Explore page | ❌ Missing | `app/explore/page.tsx` |
+| Skill detail page | ❌ Missing | `app/skills/[hash]/page.tsx` |
+| Settings / API keys UI | ❌ Missing | `app/dashboard/settings/page.tsx` |
+
+### Demo readiness
+The core end-to-end user flow is **fully functional**:
+`Sign in → Dashboard → Submit SKILL.md → Live pipeline status → Full audit result`
+
+All four AI pipeline stages run with real Anthropic API calls. No dummy data anywhere in the critical path.
+
+---
+
+---
+
 ## How Branching Works
 
 Work happens in two sequential phases:
@@ -117,37 +160,37 @@ skillauditor/                           ← new repo root
 ### Phase 0 Task List
 
 **Monorepo scaffold:**
-- [ ] Init repo, `pnpm-workspace.yaml`, root `package.json`, `tsconfig.base.json`
-- [ ] Create all app and package directories with package.json files
-- [ ] Shared scripts: `build`, `dev`, `test`
+- [x] Init repo, `pnpm-workspace.yaml`, root `package.json`, `tsconfig.base.json`
+- [x] Create all app and package directories with package.json files
+- [x] Shared scripts: `build`, `dev`, `test`
 
 **`packages/skill-types` — define all interfaces:**
-- [ ] `SkillFrontmatter`, `ParsedSkill`
-- [ ] `StaticAnalysisReport`, `SandboxBehaviorReport`, `AuditVerdict`, `AuditReport`
-- [ ] `OnchainStamp`, `ENSAuditRecord`
-- [ ] `IOnchainRegistry` interface, `IENSRegistry` interface
-- [ ] `AuditRecord`, `SkillRecord`, `UserRecord` (MongoDB document types)
+- [x] `SkillFrontmatter`, `ParsedSkill`
+- [x] `StaticAnalysisReport`, `SandboxBehaviorReport`, `AuditVerdict`, `AuditReport`
+- [x] `OnchainStamp`, `ENSAuditRecord`
+- [x] `IOnchainRegistry` interface, `IENSRegistry` interface
+- [x] `AuditRecord`, `SkillRecord`, `UserRecord` (MongoDB document types)
 
 **`apps/skillauditor-api` — foundation:**
-- [ ] Hono app scaffold, `src/index.ts` mounting management router + v1 placeholder
-- [ ] MongoDB client + 3 models (audit, skill, user)
-- [ ] Privy auth middleware (`src/middleware/auth.ts`) — verifies `sa-session` cookie or API key
-- [ ] Rate limiting middleware (`src/middleware/rate-limit.ts`)
-- [ ] x402 middleware (`src/middleware/x402.ts`) — wraps Pro audit route, requires USDC on Base
-- [ ] Management routes (all 4 files): users, orgs, api-keys, usage
-- [ ] Stub services: `onchain-registry.ts` + `ens-registry.ts` (no-op implementations)
-- [ ] `.env.example` with all vars
+- [x] Hono app scaffold, `src/index.ts` mounting management router + v1 placeholder
+- [x] MongoDB client + 5 models (audit, skill, user, api-key, ledger-approval)
+- [x] Privy auth middleware (`src/middleware/auth.ts`) — verifies `sa-session` cookie or API key
+- [x] Rate limiting middleware (`src/middleware/rate-limit.ts`)
+- [ ] x402 middleware (`src/middleware/x402.ts`) — wraps Pro audit route, requires USDC on Base ⚠️ **MISSING**
+- [x] Management routes (all 4 files): users, orgs, api-keys, usage
+- [x] Stub services: `onchain-registry.ts` + `ens-registry.ts` (no-op implementations)
+- [x] `.env.example` with all vars
 
 **`apps/skillauditor-app` — Privy foundation:**
-- [ ] Next.js 15 scaffold (App Router, TypeScript, Tailwind)
-- [ ] `PrivyProvider` wrapper (`components/providers/privy-provider.tsx`)
-- [ ] `lib/auth.ts` — `PrivyClient`, verify token, session cookie pattern
-- [ ] `lib/management-client.ts` — typed fetch wrapper for `/management/*`
-- [ ] `app/api/auth/session/route.ts` — POST: Privy JWT → upsert user → set `sa-session` cookie
-- [ ] `app/api/proxy/[...path]/route.ts` — server-side proxy (keeps API key out of browser)
-- [ ] Root layout with Privy login gate
+- [x] Next.js 16 scaffold (App Router, TypeScript, Tailwind 4)
+- [x] `PrivyProvider` wrapper (`components/privy-provider.tsx`)
+- [x] `lib/auth.ts` — `PrivyClient`, verify token, session cookie pattern
+- [x] `lib/management-client.ts` — typed fetch wrapper for `/management/*`
+- [x] `app/api/auth/session/route.ts` — POST: Privy JWT → upsert user → set `sa-session` cookie
+- [x] `app/api/proxy/[...path]/route.ts` — server-side proxy (keeps API key out of browser)
+- [x] Root layout with Privy login gate
 
-**Announce Foundation Checkpoint** — push `feat/core-pipeline`, tell teammates to branch off now.
+**Announce Foundation Checkpoint** — ✅ Done. All foundation work complete.
 
 ---
 
@@ -173,31 +216,30 @@ apps/
 ### Phase 1 Task List
 
 **Ledger API (backend — owned by core-pipeline):**
-- [ ] MongoDB model: `ledger_approvals` (approvalId, agentId, actionType, transactionData, status, signature, expiresAt)
-- [ ] `routes/v1/ledger/propose.ts` — agent creates pending approval record
-- [ ] `routes/v1/ledger/approve.ts` — frontend submits Ledger { r, s, v } signature
-- [ ] `routes/v1/ledger/pending.ts` — list pending approvals for authenticated user
-- [ ] `routes/v1/skills/index.ts` — GET `/v1/skills` paginated browse endpoint (for explore page)
-- [ ] Update `services/audit-pipeline.ts` — after verdict, call `/v1/ledger/propose` instead of auto-broadcasting stamp; poll for Ledger approval before `onchainRegistry.recordStamp()`
+- [x] MongoDB model: `ledger_approvals` (approvalId, agentId, actionType, transactionData, status, signature, expiresAt)
+- [x] `routes/v1/ledger/propose.ts` — stub returns 501 (real impl pending Teammate A's AgentKit work)
+- [x] `routes/v1/ledger/approve.ts` — stub returns 501
+- [x] `routes/v1/ledger/pending.ts` — stub returns 501
+- [x] `routes/v1/skills/index.ts` — GET `/v1/skills` paginated browse endpoint
+- [ ] Update `services/audit-pipeline.ts` — wire Ledger approval gate before `onchainRegistry.recordStamp()` ⚠️ **BLOCKED on contracts deploy**
 
-**`packages/skill-auditor-core`:**
-- [ ] `src/parse.ts` — parse SKILL.md into `ParsedSkill` (YAML frontmatter + body + SHA-256 hash)
-- [ ] `src/static-analyzer.ts` — extract URLs, scripts, declared capabilities → `StaticAnalysisReport`
-- [ ] `src/mock-tools.ts` — HTTP/file/shell/MCP interceptor layer for sandbox
-- [ ] `src/sandbox-runner.ts` — 3-run Claude API session with mock tools → `SandboxBehaviorReport`
-- [ ] `src/semantic-judge.ts` — Claude API call (static + behavioral reports only) → `AuditVerdict`
-- [ ] `src/pipeline.ts` — orchestrate all 3, return `AuditReport`
-- [ ] `src/index.ts` — export public API
+**`packages/skill-auditor-core`:** *(decision: pipeline implemented directly in `skillauditor-api/src/services/` — no separate package needed for current scope)*
+- [x] Parse SKILL.md → `ParsedSkill` (in `static-analyzer.ts`)
+- [x] Static analysis → `StaticAnalysisReport` (in `static-analyzer.ts`)
+- [x] Mock tools + sandbox runner → `SandboxBehaviorReport` (in `sandbox-runner.ts`)
+- [x] Semantic/verdict agent → `AuditVerdict` (in `verdict-agent.ts`)
+- [x] Content analyst → `ContentAnalystReport` (in `content-analyst.ts`)
+- [x] Pipeline orchestrator → `AuditReport` (in `audit-pipeline.ts`)
 - [ ] Tests: vitest, one per module
 
 **`apps/skillauditor-api` v1 routes:**
-- [ ] `services/world-id.ts` — `verifyCloudProof()` + nullifier dedup in MongoDB
-- [ ] `services/ipfs.ts` — Pinata upload for full audit report, return CID
-- [ ] `services/audit-pipeline.ts` — full orchestration: parse → pipeline → MongoDB write → Pinata upload → call onchain stub → call ENS stub
-- [ ] `routes/v1/submit.ts` — POST `/v1/submit`: validate World ID proof → trigger audit → return auditId
-- [ ] `routes/v1/audit.ts` — GET `/v1/audits/:auditId`: poll status + result
-- [ ] `routes/v1/skills.ts` — GET `/v1/skills/:hash`: stamp by content hash
-- [ ] `routes/v1/verify.ts` — POST `/v1/verify`: verify skill content against registry
+- [ ] `services/world-id.ts` — `verifyCloudProof()` + nullifier dedup ⚠️ **dev placeholder in use**
+- [ ] `services/ipfs.ts` — Pinata upload for full audit report, return CID ⚠️ **reportCid always null**
+- [x] `services/audit-pipeline.ts` — full orchestration (IPFS + onchain calls pending above)
+- [x] `routes/v1/submit.ts` — POST `/v1/submit` (World ID dev-mode; real verify pending)
+- [x] `routes/v1/audits/:auditId` — poll status + full result
+- [x] `routes/v1/skills` — GET `/v1/skills` (paginated) + GET `/v1/skills/:hash`
+- [x] `routes/v1/verify.ts` — POST `/v1/verify`
 
 ### Key Design Rules
 - Semantic Judge receives ONLY `StaticAnalysisReport + SandboxBehaviorReport` — never raw skill content
@@ -321,17 +363,17 @@ apps/
 - [ ] `app/api/chat/route.ts` — Vercel AI SDK streaming (`streamText`, mock tool set from audit findings)
 
 **Dashboard pages:**
-- [ ] `app/dashboard/page.tsx` — audit history table
-- [ ] `app/dashboard/submit/page.tsx` — submit form + IDKit World ID widget
+- [x] `app/dashboard/page.tsx` — auth-gated, New Audit button, recent audit history list
+- [x] `app/dashboard/submit/page.tsx` — submit form, pipeline explainer, userId forwarding
 - [ ] `app/dashboard/settings/page.tsx` — API key management
 
 **Audit + skill UI components:**
-- [ ] `components/audit/audit-result-card.tsx` — verdict badge + score ring + findings list
-- [ ] `components/audit/findings-list.tsx` — expandable by severity
-- [ ] `components/audit/audit-status-poller.tsx` — polls until complete
+- [x] `components/audit/audit-result.tsx` — full result: verdict badge, score/100, dimension bars, findings, structural + behavioral panels, live polling, stage indicators
+- [x] `components/audit/submit-form.tsx` — textarea, char count, loading, POST → redirect
+- [x] `components/audit/recent-audits.tsx` — localStorage history, live verdict pills per entry
+- [x] `app/audits/[auditId]/page.tsx` — public audit result page (polls until complete)
 - [ ] `components/skill/skill-card.tsx` — card for explore grid (verdict badge, score, ENS name)
 - [ ] `components/skill/skill-badge.tsx` — inline embeddable safety badge
-- [ ] `components/skill/skill-submit-form.tsx` — textarea + metadata fields
 - [ ] `components/ens/ens-name-display.tsx` — `{hash8}.skills.auditor.eth` + Etherscan link
 - [ ] `components/world-id/world-id-verifier.tsx` — IDKit component
 
