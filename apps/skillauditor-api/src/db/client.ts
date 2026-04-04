@@ -1,5 +1,9 @@
 import mongoose from 'mongoose'
 
+// Allow Mongoose to buffer commands for up to 35s — slightly longer than
+// serverSelectionTimeoutMS so in-flight requests survive an Atlas cold start.
+mongoose.set('bufferTimeoutMS', 35_000)
+
 let isConnected = false
 let connectionAttemptInFlight: Promise<void> | null = null
 
@@ -19,7 +23,7 @@ export async function connectDb(): Promise<void> {
   connectionAttemptInFlight = mongoose
     .connect(uri, {
       dbName: 'skillauditor',
-      serverSelectionTimeoutMS: 5_000,
+      serverSelectionTimeoutMS: 30_000,
     })
     .then(() => {
       isConnected = true

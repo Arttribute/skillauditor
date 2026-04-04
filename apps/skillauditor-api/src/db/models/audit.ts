@@ -20,9 +20,22 @@ const sandboxRunSchema = new Schema({
 
 const findingSchema = new Schema({
   severity:    { type: String, enum: ['info', 'low', 'medium', 'high', 'critical'], required: true },
-  category:    { type: String, enum: ['exfiltration', 'injection', 'scope_creep', 'inconsistency', 'suspicious_url', 'deceptive_metadata'], required: true },
+  category: {
+    type: String,
+    enum: [
+      // Content analysis categories
+      'instruction_hijacking', 'identity_replacement', 'concealment_directive',
+      'deceptive_description', 'social_engineering', 'scope_manipulation',
+      'exfiltration_directive', 'conditional_activation',
+      // Behavioral analysis categories
+      'exfiltration', 'injection', 'scope_creep', 'inconsistency',
+      'suspicious_url', 'deceptive_metadata',
+    ],
+    required: true,
+  },
   description: { type: String, required: true },
   evidence:    { type: String, required: true },
+  source:      { type: String, enum: ['content_analysis', 'behavioral_analysis', 'structural'] },
 }, { _id: false })
 
 const auditSchema = new Schema(
@@ -33,7 +46,7 @@ const auditSchema = new Schema(
 
     submittedBy: {
       userId:                    { type: String, required: true },
-      worldIdNullifier:          { type: String, required: true, unique: true },
+      worldIdNullifier:          { type: String, required: true },
       worldIdVerificationLevel:  { type: String, enum: ['orb', 'device'], required: true },
       submittedAt:               { type: Date, required: true },
     },
@@ -57,9 +70,11 @@ const auditSchema = new Schema(
     findings: { type: [findingSchema], default: [] },
 
     onchain: {
-      txHash:     { type: String, default: null },
-      ensSubname: { type: String, default: null },
-      stampedAt:  { type: Date, default: null },
+      txHash:           { type: String, default: null },
+      chainId:          { type: Number, default: null },
+      contractAddress:  { type: String, default: null },
+      ensSubname:       { type: String, default: null },
+      stampedAt:        { type: Date, default: null },
     },
 
     completedAt: { type: Date, default: null },

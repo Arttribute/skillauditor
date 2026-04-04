@@ -79,7 +79,6 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
         description:    structuralReport.frontmatter.description ?? '',
         version:        structuralReport.frontmatter.version ?? '0.0.0',
         firstAuditedAt: new Date(),
-        auditCount:     0,
       },
       $set: {
         lastAuditedAt: new Date(),

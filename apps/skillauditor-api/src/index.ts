@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { createMiddleware } from 'hono/factory'
 import { connectDb, getDbStatus } from './db/client.js'
 import { authMiddleware } from './middleware/auth.js'
 import { generalRateLimit, submitRateLimit } from './middleware/rate-limit.js'
@@ -36,6 +37,22 @@ app.get('/', (c) =>
   c.json({ status: 'ok', service: 'skillauditor-api', db: getDbStatus() }),
 )
 app.get('/health', (c) => c.json({ status: 'ok', db: getDbStatus() }))
+
+// ── DB readiness guard ────────────────────────────────────────────────────────
+// When MongoDB is disconnected (all retries exhausted, not currently attempting),
+// return 503 immediately rather than letting Mongoose buffer operations until
+// they time out. 'connecting' state is allowed through — Mongoose will buffer
+// the operation and it should succeed once Atlas responds.
+const dbReadyGuard = createMiddleware(async (c, next) => {
+  if (getDbStatus() === 'disconnected') {
+    return c.json({ error: 'Service temporarily unavailable, please retry shortly' }, 503, {
+      'Retry-After': '5',
+    })
+  }
+  return next()
+})
+app.use('/v1/*', dbReadyGuard)
+app.use('/management/*', dbReadyGuard)
 
 // ── v1 routes ─────────────────────────────────────────────────────────────────
 app.use('/v1/*', generalRateLimit)
