@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 import { getCookie } from 'hono/cookie'
+import { createHash } from 'crypto'
 import { PrivyClient } from '@privy-io/server-auth'
 import { ApiKey } from '../db/models/index.js'
 
@@ -16,7 +17,7 @@ function getPrivy(): PrivyClient {
 export type AuthContext = {
   Variables: {
     userId: string
-    authMethod: 'privy' | 'api-key'
+    authMethod: 'privy' | 'api-key' | 'world-agentkit'
   }
 }
 
@@ -25,7 +26,8 @@ export const authMiddleware = createMiddleware<AuthContext>(async (c, next) => {
   // 1. Try API key (X-API-Key header) — used by agents and programmatic clients
   const apiKey = c.req.header('X-API-Key')
   if (apiKey) {
-    const record = await ApiKey.findOne({ keyHash: apiKey }).lean()
+    const keyHash = createHash('sha256').update(apiKey).digest('hex')
+    const record = await ApiKey.findOne({ keyHash }).lean()
     if (!record) return c.json({ error: 'Invalid API key' }, 401)
     c.set('userId', record.userId)
     c.set('authMethod', 'api-key')

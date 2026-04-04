@@ -54,9 +54,10 @@ verify.post('/', async (c) => {
 
   const isSafe = result.verdict === 'safe' && (result.score as number) >= 70
 
-  // Also pull ENS subname if stamped onchain
-  const skill = await Skill.findOne({ hash: skillHash }, { ensSubname: 1 }).lean()
+  // Pull ENS subname + onchain stamp from the completed audit record
+  const skill   = await Skill.findOne({ hash: skillHash }, { ensSubname: 1 }).lean()
   const skillDoc = skill as Record<string, unknown> | null
+  const onchain  = doc.onchain as Record<string, unknown> | undefined
 
   return c.json({
     skillHash,
@@ -65,8 +66,16 @@ verify.post('/', async (c) => {
     score:       result.score,
     auditId:     doc.auditId,
     auditedAt:   doc.completedAt,
-    ensSubname:  skillDoc?.ensSubname ?? null,
-    onchainStamp: null,  // populated when onchain registry is integrated
+    ensSubname:  skillDoc?.ensSubname ?? onchain?.ensName ?? null,
+    onchainStamp: onchain?.txHash
+      ? {
+          txHash:          onchain.txHash,
+          chainId:         onchain.chainId,
+          contractAddress: onchain.contractAddress,
+          ensName:         onchain.ensName ?? null,
+          stampedAt:       onchain.stampedAt,
+        }
+      : null,
   })
 })
 

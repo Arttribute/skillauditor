@@ -11,44 +11,41 @@ export default async function SubmitPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-          ← Dashboard
-        </Link>
-        <span className="text-zinc-200">|</span>
-        <span className="text-sm font-medium text-zinc-900">Submit Skill for Audit</span>
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900">SkillAuditor</Link>
+        <span className="text-zinc-200">/</span>
+        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Dashboard</Link>
+        <span className="text-zinc-200">/</span>
+        <span className="text-sm font-medium text-zinc-900">Submit</span>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-        {/* Page title */}
+      <main className="flex-1 px-6 py-10 max-w-2xl mx-auto w-full">
         <div className="mb-8">
-          <h1 className="text-xl font-semibold text-zinc-900">Submit a SKILL.md for Audit</h1>
-          <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
-            Paste the raw content of a SKILL.md file. The four-stage pipeline will analyze it
-            for instruction hijacking, data exfiltration, scope manipulation, and other threats.
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Submit a Skill for Audit</h1>
+          <p className="text-sm text-zinc-500 mt-2 leading-relaxed">
+            Paste the raw content of a SKILL.md file. The four-stage pipeline analyzes it
+            for injection, exfiltration, scope manipulation, and behavioral inconsistencies.
           </p>
         </div>
 
         <SubmitForm userId={session.userId} />
 
-        {/* How it works */}
-        <div className="mt-10 border-t border-zinc-100 pt-8">
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-4">How the audit works</p>
-          <ol className="flex flex-col gap-3">
+        <div className="mt-12 border-t border-zinc-100 pt-8">
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-5">How the audit works</p>
+          <ol className="flex flex-col gap-4">
             {[
-              ['Structural Extraction', 'Deterministic parse — SHA-256 hash, frontmatter, declared capabilities, external URLs'],
-              ['Content Analysis', 'LLM examines the skill for deception patterns, injection attempts, and exfiltration directives'],
-              ['Sandbox Simulation', 'Skill executed in an isolated mock workstation with honeypot credentials and 14 intercepted tool types'],
-              ['Verdict Synthesis', 'A final agent synthesizes all findings — never seeing raw skill content — into a scored verdict'],
+              ['Structural Extraction', 'SHA-256 hash, frontmatter parse, declared capabilities, external URLs'],
+              ['Content Analysis', 'LLM examines skill instructions for deception, injection, and exfiltration directives'],
+              ['Sandbox Simulation', 'Skill executed in an isolated mock environment with honeypot credentials and 14 intercepted tool types'],
+              ['Verdict Synthesis', 'A judging layer reconciles what the skill says with what it actually does'],
             ].map(([title, desc], i) => (
-              <li key={i} className="flex gap-3 text-sm">
-                <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium text-zinc-500">
+              <li key={i} className="flex gap-4 text-sm">
+                <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-[#eff4ff] text-xs font-semibold text-[#0052ff]">
                   {i + 1}
                 </span>
                 <div>
-                  <span className="font-medium text-zinc-700">{title}</span>
-                  <span className="text-zinc-500"> — {desc}</span>
+                  <span className="font-semibold text-zinc-800">{title}</span>
+                  <span className="text-zinc-400"> — {desc}</span>
                 </div>
               </li>
             ))}

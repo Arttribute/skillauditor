@@ -6,9 +6,12 @@ import { createMiddleware } from 'hono/factory'
 import { connectDb, getDbStatus } from './db/client.js'
 import { authMiddleware } from './middleware/auth.js'
 import { generalRateLimit, submitRateLimit } from './middleware/rate-limit.js'
+import { proPaymentGate } from './middleware/x402.js'
+import { worldAgentkitMiddleware } from './middleware/world-agentkit.js'
 
 // Routes — v1 (public + World ID gated)
-import submitRoute from './routes/v1/submit.js'
+import submitRoute      from './routes/v1/submit.js'
+import agentSubmitRoute from './routes/v1/agent-submit.js'
 import auditsRoute from './routes/v1/audits.js'
 import skillsRoute from './routes/v1/skills.js'
 import verifyRoute from './routes/v1/verify.js'
@@ -62,9 +65,19 @@ app.route('/v1/skills', skillsRoute)
 app.route('/v1/verify', verifyRoute)
 app.route('/v1/audits', auditsRoute)
 
-// World ID gated — auth handled inside the route
+// World ID gated + x402 Pro payment gate — auth handled inside the route
 app.use('/v1/submit', submitRateLimit)
+app.use('/v1/submit', proPaymentGate)
 app.route('/v1/submit', submitRoute)
+
+// World AgentKit gated — third-party human-backed agents
+// worldAgentkitMiddleware verifies the `agentkit` header (SIWE signature + AgentBook
+// human-identity lookup) before the request reaches the submit handler.
+// proPaymentGate is applied so Pro tier agent submissions also require $9 USDC on Base.
+app.use('/v1/agent/submit', submitRateLimit)
+app.use('/v1/agent/submit', worldAgentkitMiddleware)
+app.use('/v1/agent/submit', proPaymentGate)
+app.route('/v1/agent/submit', agentSubmitRoute)
 
 // Ledger — auth required
 app.use('/v1/ledger/*', authMiddleware)

@@ -26,11 +26,10 @@ skills.get('/', async (c) => {
   ])
 
   return c.json({
-    data:  docs,
+    skills:   docs,
     total,
     page,
-    limit,
-    pages: Math.ceil(total / limit),
+    pageSize: limit,
   })
 })
 
@@ -53,7 +52,7 @@ skills.get('/:hash', async (c) => {
       'result.verdict': 1,
       'result.score': 1,
       findings: 1,
-      'pipeline.semanticJudge': 1,
+      'pipeline.verdict': 1,
       completedAt: 1,
     },
   )

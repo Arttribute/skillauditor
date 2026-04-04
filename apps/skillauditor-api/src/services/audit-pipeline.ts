@@ -3,10 +3,11 @@ import { runStaticAnalysis }  from './static-analyzer.js'
 import { runContentAnalysis } from './content-analyst.js'
 import { runSandboxAnalysis, type SandboxToolEvent } from './sandbox-runner.js'
 import { runVerdictAgent }    from './verdict-agent.js'
-import { onchainRegistry }    from './onchain-registry.js'
+import { createAuditAgent }   from './agentkit-session.js'
+import { uploadAuditReport }  from './ipfs.js'
 import { Audit } from '../db/models/audit.js'
 import { Skill } from '../db/models/skill.js'
-import type { AuditReport } from '@skillauditor/skill-types'
+import type { AuditReport, VerdictData } from '@skillauditor/skill-types'
 
 export interface SubmissionInput {
   skillContent: string
@@ -267,7 +268,27 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     recommendation:           verdict.recommendation,
   }
 
-  log.info('pipeline', 'Audit complete — persisting results')
+  log.info('pipeline', 'Audit complete — uploading report to IPFS')
+  await log.flush()
+
+  // ── IPFS upload (non-blocking on failure) ─────────────────────────────────────
+  let reportCid: string | null = null
+  try {
+    const ipfsResult = await uploadAuditReport(report)
+    if (ipfsResult) {
+      reportCid = ipfsResult.cid
+      log.info('pipeline', `Report pinned to IPFS — CID: ${reportCid}`)
+    } else {
+      log.warn('pipeline', 'IPFS upload skipped (PINATA_JWT not configured)')
+    }
+  } catch (err) {
+    log.warn('pipeline', `IPFS upload failed (non-fatal): ${(err as Error).message}`)
+  }
+
+  // Attach CID to report for onchain stamp
+  report.reportCid = reportCid ?? undefined
+
+  log.info('pipeline', 'Persisting final results')
 
   // ── Persist completed state ───────────────────────────────────────────────────
   await Promise.all([
@@ -279,6 +300,7 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
           'pipeline.verdict':    verdict,
           'result.verdict':      verdict.verdict,
           'result.score':        verdict.overallScore,
+          'result.reportCid':    reportCid,
           findings:              verdict.findings,
           completedAt:           new Date(),
         },
@@ -299,40 +321,88 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
   await log.flush()
 
   // ── Onchain stamp ─────────────────────────────────────────────────────────────
-  recordOnchain(auditId, report, log).catch(err => {
+  recordOnchain(auditId, report, input.submittedBy.worldIdNullifier, input.skillName, log).catch(err => {
     console.error(`[audit-pipeline] ${auditId} — onchain stamp failed (non-fatal):`, err.message)
   })
 }
 
-async function recordOnchain(auditId: string, report: AuditReport, log: PipelineLogger): Promise<void> {
-  log.info('onchain', 'Recording audit stamp on Base…')
+async function recordOnchain(
+  auditId:   string,
+  report:    AuditReport,
+  nullifier: string,
+  skillName: string,
+  log:       PipelineLogger,
+): Promise<void> {
+  log.info('onchain', 'Creating audit agent session…')
   await log.flush()
 
+  // Create or resume CDP wallet session keyed by World ID nullifier.
+  // In dev mode (no CDP creds) falls back to AUDITOR_AGENT_PRIVATE_KEY via viem.
+  const agent = await createAuditAgent(nullifier)
+  log.info('onchain', `Agent ready — wallet=${agent.walletAddress} mode=${agent.mode}`)
+  await log.flush()
+
+  // ── Step 1: Write audit stamp to SkillRegistry ────────────────────────────
+  // Proposes the action to /v1/ledger/propose, waits for Ledger hardware
+  // signature, then broadcasts. Gate is bypassed when ledger routes return 501.
+  const auditedAt = Math.floor(Date.now() / 1000)
+
+  const { txHash } = await agent.writeRegistryStampAction({
+    skillHash:  report.skillHash,
+    verdict:    report.verdict,
+    score:      report.overallScore,
+    reportCid:  report.reportCid ?? '',
+    nullifier,
+    ensSubname: '',   // updated after ENS registration below
+    skillName,
+    auditedAt,
+  })
+
+  await Audit.updateOne(
+    { auditId },
+    {
+      $set: {
+        'onchain.txHash':          txHash,
+        'onchain.chainId':         Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532'),
+        'onchain.contractAddress': process.env.SKILL_REGISTRY_ADDRESS ?? '',
+        'onchain.stampedAt':       new Date(),
+      },
+    },
+  )
+
+  log.info('onchain', `Stamp confirmed — txHash: ${txHash}`)
+  await log.flush()
+
+  // ── Step 2: Register ENS subname ──────────────────────────────────────────
+  // Registers {hash8}.skills.auditor.eth with verdict + score text records.
+  // Also goes through the Ledger approval gate.
+  // Non-fatal — degrades gracefully when ENS infrastructure not yet deployed (Blocker 1).
   try {
-    const { txHash } = await onchainRegistry.recordStamp({
-      skillHash:  report.skillHash,
+    const verdictData: VerdictData = {
       verdict:    report.verdict,
       score:      report.overallScore,
-      reportCid:  '',
-      ensSubname: '',
-      nullifier:  '',
+      reportCid:  report.reportCid ?? '',
+      auditedAt,
+      auditorEns: agent.walletAddress,   // wallet address until ENS name is assigned
+      skillName,
+      version:    report.version ?? '1.0.0',
+    }
+
+    const { ensName } = await agent.registerENSSubnameAction({
+      skillHash:   report.skillHash,
+      verdictData,
+      nullifier,
     })
 
     await Audit.updateOne(
       { auditId },
-      {
-        $set: {
-          'onchain.txHash':          txHash,
-          'onchain.chainId':         Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532'),
-          'onchain.contractAddress': process.env.SKILL_REGISTRY_ADDRESS ?? '',
-          'onchain.stampedAt':       new Date(),
-        },
-      },
+      { $set: { 'onchain.ensName': ensName } },
     )
 
-    log.info('onchain', `Onchain stamp confirmed — txHash: ${txHash}`)
+    log.info('onchain', `ENS subname registered — ${ensName}`)
     await log.flush()
-  } catch (err) {
-    throw err
+  } catch (ensErr) {
+    log.warn('onchain', `ENS registration skipped (non-fatal): ${(ensErr as Error).message}`)
+    await log.flush()
   }
 }

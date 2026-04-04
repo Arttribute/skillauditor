@@ -1,0 +1,163 @@
+{
+  "$schema": "https://specs.ledger.com/erc7730/v1/schema.json",
+  "context": {
+    "contract": {
+      "abi": [
+        {
+          "type": "function",
+          "name": "recordStamp",
+          "inputs": [
+            { "name": "skillHash", "type": "bytes32" },
+            { "name": "verdict",   "type": "uint8"   },
+            { "name": "score",     "type": "uint8"   },
+            { "name": "reportCid", "type": "bytes32" }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "revokeStamp",
+          "inputs": [
+            { "name": "skillHash", "type": "bytes32" }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "updateEnsNode",
+          "inputs": [
+            { "name": "skillHash", "type": "bytes32" },
+            { "name": "ensNode",   "type": "bytes32" }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "setAuditorAgent",
+          "inputs": [
+            { "name": "newAgent", "type": "address" }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "setPaused",
+          "inputs": [
+            { "name": "_paused", "type": "bool" }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        }
+      ],
+      "deployments": [
+        {
+          "chainId": 84532,
+          "address": "0x87C3E6C452585806Ef603a9501eb74Ce740Cafcc"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "SkillAuditor",
+    "info": {
+      "legalName": "SkillAuditor",
+      "url": "https://skillauditor.app",
+      "deploymentDate": "2026-04-04"
+    },
+    "constants": {
+      "VERDICT_UNSAFE":           "0",
+      "VERDICT_REVIEW_REQUIRED":  "1",
+      "VERDICT_SAFE":             "2"
+    }
+  },
+  "display": {
+    "formats": {
+      "recordStamp(bytes32,uint8,uint8,bytes32)": {
+        "intent": "Record AI Skill Safety Stamp",
+        "fields": [
+          {
+            "path":   "skillHash",
+            "label":  "Skill Content Hash",
+            "format": "raw"
+          },
+          {
+            "path":   "verdict",
+            "label":  "Safety Verdict",
+            "format": "enum",
+            "params": {
+              "values": {
+                "0": "UNSAFE — Do not load this skill",
+                "1": "REVIEW REQUIRED — Use with caution",
+                "2": "SAFE — Verified by SkillAuditor"
+              }
+            }
+          },
+          {
+            "path":   "score",
+            "label":  "Safety Score (0-100)",
+            "format": "raw"
+          },
+          {
+            "path":   "reportCid",
+            "label":  "IPFS Audit Report (SHA-256)",
+            "format": "raw"
+          }
+        ],
+        "required":   ["skillHash", "verdict", "score"]
+      },
+      "revokeStamp(bytes32)": {
+        "intent": "Revoke Skill Safety Stamp",
+        "fields": [
+          {
+            "path":   "skillHash",
+            "label":  "Skill Content Hash to Revoke",
+            "format": "raw"
+          }
+        ],
+        "required": ["skillHash"]
+      },
+      "updateEnsNode(bytes32,bytes32)": {
+        "intent": "Update Skill ENS Name",
+        "fields": [
+          {
+            "path":   "skillHash",
+            "label":  "Skill Content Hash",
+            "format": "raw"
+          },
+          {
+            "path":   "ensNode",
+            "label":  "ENS Node (skills.skillauditor.eth subname)",
+            "format": "raw"
+          }
+        ],
+        "required": ["skillHash", "ensNode"]
+      },
+      "setAuditorAgent(address)": {
+        "intent": "Rotate Authorised Auditor Agent",
+        "fields": [
+          {
+            "path":   "newAgent",
+            "label":  "New Auditor Agent Address",
+            "format": "addressName"
+          }
+        ],
+        "required": ["newAgent"]
+      },
+      "setPaused(bool)": {
+        "intent": "Pause / Unpause SkillRegistry",
+        "fields": [
+          {
+            "path":   "_paused",
+            "label":  "Pause Registry",
+            "format": "raw"
+          }
+        ],
+        "required": ["_paused"]
+      }
+    }
+  }
+}

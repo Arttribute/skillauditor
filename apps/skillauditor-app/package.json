@@ -9,11 +9,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.66",
+    "@ai-sdk/react": "^3.0.148",
+    "@ledgerhq/device-management-kit": "^1.2.0",
+    "@ledgerhq/device-transport-kit-web-hid": "^1.2.3",
     "@privy-io/react-auth": "^3.19.0",
     "@privy-io/server-auth": "^1.32.5",
+    "@worldcoin/idkit": "^4.0.11",
+    "ai": "^6.0.146",
     "next": "16.2.2",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "rxjs": "^7.8.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
