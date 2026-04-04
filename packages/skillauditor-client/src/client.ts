@@ -19,10 +19,19 @@
 // The wallet at privateKey must be registered in World AgentBook for prod:
 //   npx @worldcoin/agentkit-cli register <wallet-address>
 
-import { buildAgentkitHeader }                      from './agentkit.js'
-import { fetchWithX402, type PaymentHandler }        from './x402.js'
+import { buildAgentkitHeader }                                     from './agentkit.js'
+import { fetchWithX402, type PaymentHandler }                      from './x402.js'
 import { pollUntilComplete, type VerifyResult, type ProgressEvent } from './poller.js'
-import { SkillRejectedError }                        from './errors.js'
+import { SkillRejectedError }                                      from './errors.js'
+import {
+  createConsoleLogger,
+  printAuditHeader,
+  printAuditResult,
+  printAuditRejected,
+  type LogsOption,
+} from './logger.js'
+
+export type { LogsOption }
 
 export interface SkillAuditorClientOptions {
   /**
@@ -50,8 +59,20 @@ export interface SkillAuditorClientOptions {
   paymentHandler?: PaymentHandler
 
   /**
+   * Controls terminal log output.
+   *
+   *   true (default)  — normal: stage transitions + warnings, no per-tool-call noise
+   *   'verbose'       — everything, including every sandbox tool call
+   *   false           — silent: no terminal output at all
+   *
+   * You can also supply a custom onProgress callback instead for full control.
+   * If both logs and onProgress are provided, onProgress takes precedence.
+   */
+  logs?: LogsOption
+
+  /**
+   * Custom progress handler. Overrides the built-in console logger.
    * Called for each pipeline log entry while the audit is running.
-   * Useful for showing live progress in a UI or terminal.
    */
   onProgress?: (event: ProgressEvent) => void
 
@@ -75,6 +96,8 @@ export interface SkillAuditorClientOptions {
 export interface VerifyOptions {
   /** Override the instance-level tier for this call only. */
   tier?: 'free' | 'pro'
+  /** Override the instance-level logs setting for this call only. */
+  logs?: LogsOption
   /** Override the instance-level onProgress for this call only. */
   onProgress?: (event: ProgressEvent) => void
 }
@@ -84,6 +107,7 @@ export class SkillAuditorClient {
   private readonly privateKey:     string
   private readonly tier:           'free' | 'pro'
   private readonly paymentHandler: PaymentHandler | undefined
+  private readonly logs:           LogsOption
   private readonly onProgress:     ((e: ProgressEvent) => void) | undefined
   private readonly pollIntervalMs: number
   private readonly timeoutMs:      number
@@ -94,6 +118,7 @@ export class SkillAuditorClient {
     this.privateKey     = opts.privateKey ?? 'dev'
     this.tier           = opts.tier ?? 'free'
     this.paymentHandler = opts.paymentHandler
+    this.logs           = opts.logs ?? true          // on by default
     this.onProgress     = opts.onProgress
     this.pollIntervalMs = opts.pollIntervalMs ?? 3_000
     this.timeoutMs      = opts.timeoutMs      ?? 5 * 60 * 1_000
@@ -108,19 +133,25 @@ export class SkillAuditorClient {
    *   2. POST /v1/agent/submit — kick off the audit pipeline
    *      - Auto-builds World AgentKit SIWE header from privateKey
    *      - Auto-handles x402: if 402 received, pays via paymentHandler and retries
-   *   3. Poll /v1/audits/:auditId until complete (with onProgress streaming)
+   *   3. Poll /v1/audits/:auditId until complete (with live log streaming to stdout)
    *   4. Return VerifyResult — or throw SkillRejectedError if verdict is not safe
    */
   async verifySkill(
     skillContent: string,
     opts: VerifyOptions = {},
   ): Promise<VerifyResult> {
-    const tier       = opts.tier       ?? this.tier
-    const onProgress = opts.onProgress ?? this.onProgress
+    const tier       = opts.tier ?? this.tier
+    const logsLevel  = opts.logs ?? this.logs
+    // Explicit onProgress overrides the built-in logger
+    const onProgress = opts.onProgress ?? this.onProgress ?? createConsoleLogger(logsLevel)
+    const silent     = logsLevel === false && !opts.onProgress && !this.onProgress
 
     // ── Fast path: already verified ────────────────────────────────────────────
     const cached = await this.checkVerified(skillContent)
-    if (cached.verified) return cached
+    if (cached.verified) {
+      if (!silent) printAuditResult(cached)
+      return cached
+    }
 
     // ── Submit for audit ────────────────────────────────────────────────────────
     const submitUrl = `${this.apiUrl}/v1/agent/submit`
@@ -146,15 +177,32 @@ export class SkillAuditorClient {
       throw new Error(`Skill submission failed (${submitRes.status}): ${err.error}`)
     }
 
-    const { auditId } = await submitRes.json() as { auditId: string }
+    const { auditId, skillHash } = await submitRes.json() as { auditId: string; skillHash: string }
+
+    // ── Print header now that we have auditId + skillHash ──────────────────────
+    // Extract skill name from frontmatter if possible (simple regex — no dep needed)
+    const nameMatch = skillContent.match(/^name\s*:\s*(.+)$/m)
+    const skillName = nameMatch?.[1]?.trim() ?? skillHash.slice(0, 10) + '…'
+    if (!silent) printAuditHeader(skillName, auditId, tier)
 
     // ── Poll until done ─────────────────────────────────────────────────────────
-    return pollUntilComplete(this.apiUrl, auditId, {
-      intervalMs:    this.pollIntervalMs,
-      timeoutMs:     this.timeoutMs,
-      onProgress,
-      rejectOnUnsafe: this.rejectOnUnsafe,
-    })
+    let result: VerifyResult
+    try {
+      result = await pollUntilComplete(this.apiUrl, auditId, {
+        intervalMs:     this.pollIntervalMs,
+        timeoutMs:      this.timeoutMs,
+        onProgress,
+        rejectOnUnsafe: this.rejectOnUnsafe,
+      })
+    } catch (err) {
+      if (err instanceof SkillRejectedError && !silent) {
+        printAuditRejected(err.verdict, err.score)
+      }
+      throw err
+    }
+
+    if (!silent) printAuditResult(result)
+    return result
   }
 
   /**
