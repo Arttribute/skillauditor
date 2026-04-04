@@ -165,7 +165,7 @@ export function SkillChat({ skillHash: _skillHash, skillName, skillContent, find
             <button
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-xl bg-[#0052ff] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Send
             </button>

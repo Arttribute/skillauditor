@@ -86,147 +86,197 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
     <div className="flex flex-1 flex-col">
       {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center gap-4">
-        <Link href="/explore" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-          ← Explore
-        </Link>
-        <span className="text-zinc-200">|</span>
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900">SkillAuditor</Link>
+        <span className="text-zinc-200">/</span>
+        <Link href="/explore" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Registry</Link>
+        <span className="text-zinc-200">/</span>
         <span className="text-sm font-medium text-zinc-900 truncate">{skill.name}</span>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-3xl mx-auto w-full flex flex-col gap-6">
-        {/* Hero */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-zinc-900">{skill.name}</h1>
-              {skill.version && (
-                <p className="text-sm text-zinc-400 font-mono mt-0.5">v{skill.version}</p>
+      <main className="flex-1 px-6 py-8 max-w-6xl mx-auto w-full flex flex-col gap-6">
+
+        {/* Hero row */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">{skill.name}</h1>
+              {skill.ensSubname && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[#dbeafe] bg-[#eff6ff] px-2.5 py-1 text-xs font-semibold text-[#1d4ed8]">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1L7.5 2.5L9.5 2L10 4L11.5 5.5L10.5 7L11 9L9 9.5L7.5 11L6 10L4.5 11L3 9.5L1 9L1.5 7L0.5 5.5L2 4L2.5 2L4.5 2.5L6 1Z" fill="#1d4ed8"/>
+                    <path d="M4 6L5.5 7.5L8.5 4.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Onchain Verified
+                </span>
               )}
             </div>
-            <Link
-              href={`/skills/${hash}/test`}
-              className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
-            >
-              Test this skill →
-            </Link>
+            <div className="flex items-center gap-3 mt-1.5">
+              {skill.version && <span className="text-xs text-zinc-400 font-mono">v{skill.version}</span>}
+              {skill.version && <span className="text-xs text-zinc-300">·</span>}
+              <span className="text-xs text-zinc-400">{skill.auditCount} audit{skill.auditCount !== 1 ? 's' : ''}</span>
+              {skill.ensSubname && (
+                <>
+                  <span className="text-xs text-zinc-300">·</span>
+                  <span className="text-xs text-zinc-400 font-mono">{skill.ensSubname}</span>
+                </>
+              )}
+            </div>
+            {skill.description && (
+              <p className="text-sm text-zinc-500 leading-relaxed mt-2 max-w-xl">{skill.description}</p>
+            )}
           </div>
-          {skill.description && (
-            <p className="text-sm text-zinc-500 leading-relaxed">{skill.description}</p>
-          )}
+          <Link
+            href={`/skills/${hash}/test`}
+            className="shrink-0 rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors"
+          >
+            Test this skill →
+          </Link>
         </div>
 
-        {/* Verdict + Score */}
-        <div className="rounded-xl border border-zinc-200 p-6 flex flex-col sm:flex-row sm:items-center gap-5">
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Verdict</p>
-            <VerdictBadgeLarge verdict={skill.latestVerdict} />
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* LEFT — audit results (2/3) */}
+          <div className="lg:col-span-2 flex flex-col gap-5">
+
+            {/* Verdict + Score */}
+            <div className="rounded-xl border border-zinc-200 p-5 flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Verdict</p>
+                <VerdictBadgeLarge verdict={skill.latestVerdict} />
+              </div>
+              {skill.latestScore !== null && (
+                <>
+                  <div className="hidden sm:block w-px h-10 bg-zinc-100" />
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Safety Score</p>
+                    <p className={`text-4xl font-bold tabular-nums tracking-tight ${scoreColor(skill.latestScore)}`}>
+                      {skill.latestScore}<span className="text-xl font-normal text-zinc-300">/100</span>
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Findings summary */}
+            {findings.length > 0 && (
+              <div className="rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-zinc-900">Findings</h2>
+                  <span className="text-xs text-zinc-400">{findings.length} finding{findings.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex flex-col divide-y divide-zinc-100">
+                  {findings.slice(0, 5).map((f, i) => (
+                    <div key={i} className="flex items-start gap-3 px-5 py-3">
+                      <SeverityDot severity={f.severity} />
+                      <span className="text-sm text-zinc-700 leading-relaxed">{f.description}</span>
+                    </div>
+                  ))}
+                </div>
+                {findings.length > 5 && (
+                  <div className="px-5 py-3 border-t border-zinc-100">
+                    <Link href={`/audits/${skill.latestAuditId}`} className="text-xs text-[#0052ff] hover:underline">
+                      View all {findings.length} findings →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Full audit link */}
+            {skill.latestAuditId && (
+              <Link
+                href={`/audits/${skill.latestAuditId}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors self-start"
+              >
+                View full audit report →
+              </Link>
+            )}
           </div>
-          {skill.latestScore !== null && (
-            <>
-              <div className="hidden sm:block w-px h-12 bg-zinc-100" />
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Safety Score</p>
-                <p className={`text-4xl font-semibold tabular-nums ${scoreColor(skill.latestScore)}`}>
-                  {skill.latestScore}<span className="text-xl font-normal text-zinc-400">/100</span>
+
+          {/* RIGHT — metadata sidebar (1/3) */}
+          <div className="flex flex-col gap-4">
+
+            {/* ENS Subname */}
+            <div className="rounded-xl border border-zinc-200 p-5 flex flex-col gap-3">
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Identity</p>
+              <ENSNameDisplay
+                ensName={ensName}
+                etherscanUrl={skill.ensSubname ? `https://app.ens.domains/${ensName}` : undefined}
+              />
+              {!skill.ensSubname && (
+                <p className="text-xs text-zinc-300">ENS subname registered for Pro tier audits</p>
+              )}
+            </div>
+
+            {/* Onchain stamp */}
+            {audit?.stamp ? (
+              <div className="rounded-xl border border-[#dbeafe] bg-[#f0f7ff] p-5 flex flex-col gap-4">
+                {/* Verified header */}
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center h-6 w-6 rounded-full bg-[#0052ff]">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </span>
+                  <span className="text-sm font-semibold text-[#0040cc]">Onchain Verified</span>
+                </div>
+
+                {/* Fields */}
+                <div className="flex flex-col gap-2 text-xs">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[#5b84c4] font-medium">Network</span>
+                    <span className="font-medium text-zinc-700">Base Sepolia ({audit.stamp.chainId})</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[#5b84c4] font-medium">Transaction</span>
+                    <span className="font-mono text-zinc-600 break-all">{audit.stamp.txHash}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[#5b84c4] font-medium">Contract</span>
+                    <span className="font-mono text-zinc-600 break-all">{audit.stamp.contractAddress}</span>
+                  </div>
+                  {audit.stamp.ipfsCid && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[#5b84c4] font-medium">IPFS Report</span>
+                      <span className="font-mono text-zinc-600 break-all">{audit.stamp.ipfsCid}</span>
+                    </div>
+                  )}
+                </div>
+
+                <a
+                  href={`https://sepolia.basescan.org/tx/${audit.stamp.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-medium text-[#0052ff] hover:underline"
+                >
+                  View on BaseScan →
+                </a>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-zinc-200 p-5 flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-zinc-400">Onchain Stamp</p>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Pro tier audits receive a tamper-proof stamp on Base.
                 </p>
               </div>
-            </>
-          )}
-          <div className="hidden sm:block w-px h-12 bg-zinc-100" />
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Audits</p>
-            <p className="text-sm font-medium text-zinc-700">{skill.auditCount} audit{skill.auditCount !== 1 ? 's' : ''}</p>
-          </div>
-        </div>
+            )}
 
-        {/* ENS Subname */}
-        <div className="rounded-xl border border-zinc-200 p-6">
-          <ENSNameDisplay
-            ensName={ensName}
-            etherscanUrl={skill.ensSubname ? `https://app.ens.domains/${ensName}` : undefined}
-          />
-        </div>
+            {/* Ledger approval */}
+            <SkillLedgerPanel skillHash={hash} />
 
-        {/* Onchain stamp */}
-        {audit?.stamp ? (
-          <div className="rounded-xl border border-zinc-200 p-6 flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-zinc-900">Onchain Stamp</h2>
-            <div className="grid grid-cols-1 gap-2">
-              <StampRow label="Tx Hash" value={audit.stamp.txHash} mono />
-              <StampRow label="Contract" value={audit.stamp.contractAddress} mono />
-              <StampRow label="Chain" value={`Base Sepolia (${audit.stamp.chainId})`} />
-              {audit.stamp.ipfsCid && <StampRow label="IPFS Report" value={audit.stamp.ipfsCid} mono />}
-            </div>
-            <a
-              href={`https://sepolia.basescan.org/tx/${audit.stamp.txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 text-xs text-blue-600 hover:underline"
-            >
-              View on BaseScan →
-            </a>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-zinc-200 p-6 flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-zinc-500">Onchain Stamp</h2>
-            <p className="text-xs text-zinc-400">
-              Onchain registration pending. Pro tier audits receive a tamper-proof stamp on Base.
-            </p>
-          </div>
-        )}
-
-        {/* Ledger approval modal — polls for pending stamp approvals */}
-        <SkillLedgerPanel skillHash={hash} />
-
-        {/* Findings summary */}
-        {findings.length > 0 && (
-          <div className="rounded-xl border border-zinc-200 p-6 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-900">Findings</h2>
-              <span className="text-xs text-zinc-400">{findings.length} finding{findings.length !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {findings.slice(0, 5).map((f, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs">
-                  <SeverityDot severity={f.severity} />
-                  <span className="text-zinc-700">{f.description}</span>
-                </div>
-              ))}
-              {findings.length > 5 && (
-                <p className="text-xs text-zinc-400">
-                  + {findings.length - 5} more —{' '}
-                  <Link href={`/audits/${skill.latestAuditId}`} className="text-zinc-600 underline underline-offset-2">
-                    view full audit
-                  </Link>
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Embed badge */}
-        <div className="rounded-xl border border-zinc-200 p-6 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-zinc-900">Embed Badge</h2>
-          <p className="text-xs text-zinc-500">Add this to your README to show the audit status.</p>
-          <SkillBadge hash={hash} verdict={skill.latestVerdict} score={skill.latestScore} />
-          <code className="mt-1 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2 text-xs font-mono text-zinc-600 break-all whitespace-pre-wrap">
-            {`<a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skillauditor.xyz'}/skills/${hash}">
+            {/* Embed badge */}
+            <div className="rounded-xl border border-zinc-200 p-5 flex flex-col gap-3">
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Embed Badge</p>
+              <SkillBadge hash={hash} verdict={skill.latestVerdict} score={skill.latestScore} />
+              <code className="rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2 text-[10px] font-mono text-zinc-500 break-all whitespace-pre-wrap leading-relaxed">
+                {`<a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skillauditor.xyz'}/skills/${hash}">
   <img src="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://skillauditor.xyz'}/api/badge/${hash}" alt="SkillAuditor" />
 </a>`}
-          </code>
-        </div>
-
-        {/* Full audit link */}
-        {skill.latestAuditId && (
-          <div className="flex justify-end">
-            <Link
-              href={`/audits/${skill.latestAuditId}`}
-              className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors underline underline-offset-2"
-            >
-              View full audit report →
-            </Link>
+              </code>
+            </div>
           </div>
-        )}
+        </div>
       </main>
     </div>
   )

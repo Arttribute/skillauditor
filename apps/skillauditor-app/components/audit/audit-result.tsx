@@ -195,57 +195,82 @@ export function AuditResult({ auditId }: AuditResultProps) {
       {/* Header */}
       <AuditHeader skillName={data.skillName} skillHash={data.skillHash} auditId={auditId} />
 
-      {/* Verdict + score */}
-      <div className="rounded-xl border border-zinc-200 p-6 flex flex-col sm:flex-row sm:items-center gap-5">
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Verdict</p>
-          <VerdictBadge verdict={verdict} />
-        </div>
-        <div className="hidden sm:block w-px h-12 bg-zinc-100" />
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Safety Score</p>
-          <p className={`text-4xl font-semibold tabular-nums ${scoreColor(score)}`}>
-            {score}<span className="text-xl font-normal text-zinc-400">/100</span>
-          </p>
-        </div>
-        {recommendation && (
-          <>
-            <div className="hidden sm:block w-px h-12 bg-zinc-100" />
-            <div className="flex-1 flex flex-col gap-2">
-              <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Recommendation</p>
-              <p className="text-sm text-zinc-700 leading-relaxed">{recommendation}</p>
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* LEFT — main report (2/3) */}
+        <div className="lg:col-span-2 flex flex-col gap-5">
+
+          {/* Verdict + score */}
+          <div className="rounded-xl border border-zinc-200 p-5 flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Verdict</p>
+              <VerdictBadge verdict={verdict} />
             </div>
-          </>
-        )}
-      </div>
+            <div className="hidden sm:block w-px h-10 bg-zinc-100" />
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Safety Score</p>
+              <p className={`text-4xl font-bold tabular-nums tracking-tight ${scoreColor(score)}`}>
+                {score}<span className="text-xl font-normal text-zinc-300">/100</span>
+              </p>
+            </div>
+            {recommendation && (
+              <>
+                <div className="hidden sm:block w-px h-10 bg-zinc-100" />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Recommendation</p>
+                  <p className="text-sm text-zinc-600 leading-relaxed">{recommendation}</p>
+                </div>
+              </>
+            )}
+          </div>
 
-      {/* Dimensions */}
-      {dimensions && <DimensionsPanel dimensions={dimensions} />}
+          {/* Dimensions */}
+          {dimensions && <DimensionsPanel dimensions={dimensions} />}
 
-      {/* Findings */}
-      {findings.length > 0 && <FindingsPanel findings={findings} />}
-      {findings.length === 0 && (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-700">
-          No security findings detected.
+          {/* Findings */}
+          {findings.length > 0 ? (
+            <FindingsPanel findings={findings} />
+          ) : (
+            <div className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-700">
+              No security findings detected.
+            </div>
+          )}
+
+          {/* Pipeline logs */}
+          {logs.length > 0 && <LogsPanel logs={logs} defaultOpen={false} />}
         </div>
-      )}
 
-      {/* Structural analysis */}
-      {structuralAnalysis && <StructuralPanel structural={structuralAnalysis} />}
+        {/* RIGHT — metadata sidebar (1/3) */}
+        <div className="flex flex-col gap-4">
 
-      {/* Behavioral summary */}
-      {behavioralAnalysis && <BehavioralPanel behavioral={behavioralAnalysis} />}
+          {/* Meta card */}
+          <div className="rounded-xl border border-zinc-200 p-5 flex flex-col gap-3">
+            <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Audit Info</p>
+            <div className="flex flex-col gap-2 text-xs">
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-400">Tier</span>
+                <span className="font-medium text-zinc-700 capitalize">{data.tier}</span>
+              </div>
+              {data.completedAt && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-zinc-400">Completed</span>
+                  <span className="font-medium text-zinc-700">{new Date(data.completedAt).toLocaleDateString()}</span>
+                </div>
+              )}
+              <div className="pt-1 border-t border-zinc-100">
+                <p className="text-zinc-400 mb-1">Audit ID</p>
+                <p className="font-mono text-zinc-600 break-all text-[10px]">{auditId}</p>
+              </div>
+            </div>
+          </div>
 
-      {/* Pipeline logs */}
-      {logs.length > 0 && <LogsPanel logs={logs} defaultOpen={false} />}
+          {/* Structural analysis */}
+          {structuralAnalysis && <StructuralPanel structural={structuralAnalysis} />}
 
-      {/* Meta footer */}
-      <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-100 flex flex-wrap gap-x-6 gap-y-1">
-        <span>Audit ID: <span className="font-mono">{auditId}</span></span>
-        {data.completedAt && (
-          <span>Completed: {new Date(data.completedAt).toLocaleString()}</span>
-        )}
-        <span>Tier: {data.tier}</span>
+          {/* Behavioral summary */}
+          {behavioralAnalysis && <BehavioralPanel behavioral={behavioralAnalysis} />}
+        </div>
       </div>
     </div>
   )
@@ -255,10 +280,13 @@ export function AuditResult({ auditId }: AuditResultProps) {
 
 function AuditHeader({ skillName, skillHash, auditId }: { skillName: string; skillHash: string; auditId: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <h1 className="text-xl font-semibold text-zinc-900">{skillName}</h1>
-      <p className="text-xs font-mono text-zinc-400 break-all">{skillHash}</p>
-      <p className="text-xs text-zinc-400">Audit <span className="font-mono">{auditId}</span></p>
+    <div className="flex flex-col gap-1.5">
+      <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">{skillName}</h1>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-mono text-zinc-400 truncate max-w-xs">{skillHash.slice(0, 20)}…</span>
+        <span className="text-zinc-200 text-xs">·</span>
+        <span className="text-xs text-zinc-400 font-mono">audit/{auditId.slice(0, 8)}…</span>
+      </div>
     </div>
   )
 }

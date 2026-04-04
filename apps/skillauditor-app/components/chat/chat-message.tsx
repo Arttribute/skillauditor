@@ -39,7 +39,7 @@ export function ChatMessage({ role, content, toolCalls = [], findings = [] }: Ch
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
           isUser
-            ? 'bg-zinc-900 text-white rounded-br-sm'
+            ? 'bg-[#0052ff] text-white rounded-br-sm'
             : 'bg-white border border-zinc-200 text-zinc-800 rounded-bl-sm'
         }`}
       >

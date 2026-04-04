@@ -12,18 +12,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center justify-between">
-        <span className="text-sm font-semibold text-zinc-900">SkillAuditor</span>
-        <LoginButton />
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900">SkillAuditor</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/explore" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Registry</Link>
+          <LoginButton />
+        </div>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full flex flex-col gap-8">
-        {/* Welcome */}
+      <main className="flex-1 px-6 py-10 max-w-2xl mx-auto w-full flex flex-col gap-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900">Dashboard</h1>
-            <p className="text-sm text-zinc-400 mt-0.5 font-mono">{session.userId}</p>
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Dashboard</h1>
+            <p className="text-xs text-zinc-400 mt-1 font-mono">{session.userId}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -34,18 +35,15 @@ export default async function DashboardPage() {
             </Link>
             <Link
               href="/dashboard/submit"
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors"
             >
               + New Audit
             </Link>
           </div>
         </div>
 
-        {/* Recent audits */}
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-zinc-700">Recent Audits</h2>
-          </div>
+          <h2 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Recent Audits</h2>
           <RecentAudits />
         </div>
       </main>

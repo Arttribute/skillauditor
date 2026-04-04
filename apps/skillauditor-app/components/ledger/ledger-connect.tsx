@@ -68,7 +68,7 @@ export function LedgerConnect({ onConnect, onDisconnect, className = '' }: Ledge
           type="button"
           onClick={handleConnect}
           disabled={connecting}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-lg bg-[#0052ff] px-3 py-2 text-xs font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {connecting ? (
             <span className="flex items-center gap-2">

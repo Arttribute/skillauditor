@@ -97,7 +97,7 @@ export function WorldIDVerifier({
               <button
                 onClick={handleVerify}
                 disabled={verifying}
-                className="flex-1 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                className="flex-1 rounded-xl bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-50"
               >
                 {verifying ? 'Verifying…' : isConfigured ? 'Open World App' : 'Continue (dev)'}
               </button>

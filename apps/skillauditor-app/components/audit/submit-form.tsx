@@ -113,7 +113,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
           onChange={e => setSkillName(e.target.value)}
           placeholder="e.g. GitHub PR Reviewer"
           disabled={submitting}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent disabled:opacity-50 placeholder:text-zinc-400"
+          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0052ff] focus:border-transparent disabled:opacity-50 placeholder:text-zinc-400"
         />
       </div>
 
@@ -129,7 +129,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
           placeholder={PLACEHOLDER}
           disabled={submitting}
           rows={16}
-          className="rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent disabled:opacity-50 placeholder:text-zinc-400 resize-y leading-relaxed"
+          className="rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0052ff] focus:border-transparent disabled:opacity-50 placeholder:text-zinc-400 resize-y leading-relaxed"
         />
         <div className="flex items-center justify-between text-xs text-zinc-400">
           <span>Paste the raw SKILL.md file content above</span>
@@ -148,7 +148,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
             onClick={() => setTier('free')}
             className={`rounded-lg border p-4 text-left transition-colors ${
               tier === 'free'
-                ? 'border-zinc-900 bg-zinc-900 text-white'
+                ? 'border-[#0052ff] bg-[#0052ff] text-white'
                 : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
             }`}
           >
@@ -162,7 +162,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
             onClick={() => setTier('pro')}
             className={`rounded-lg border p-4 text-left transition-colors ${
               tier === 'pro'
-                ? 'border-zinc-900 bg-zinc-900 text-white'
+                ? 'border-[#0052ff] bg-[#0052ff] text-white'
                 : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
             }`}
           >
@@ -210,7 +210,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
         <button
           type="submit"
           disabled={submitting || !skillContent.trim() || isOverLimit}
-          className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          className="rounded-lg bg-[#0052ff] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {submitting ? (
             <>

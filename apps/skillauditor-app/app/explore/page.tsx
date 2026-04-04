@@ -1,10 +1,10 @@
 import Link from 'next/link'
+import { LoginButton } from '@/components/login-button'
 import { SkillCard } from '@/components/skill/skill-card'
 import type { SkillListResponse, SkillResponse } from '@/lib/types'
 
-export const metadata = { title: 'Explore Skills — SkillAuditor' }
+export const metadata = { title: 'Skill Registry — SkillAuditor' }
 
-// Re-fetch on every request so skill list stays fresh
 export const dynamic = 'force-dynamic'
 
 interface ExplorePageProps {
@@ -71,45 +71,42 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-sm font-semibold text-zinc-900 hover:text-zinc-600 transition-colors">
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900 hover:text-zinc-600 transition-colors">
           SkillAuditor
         </Link>
-        <nav className="flex items-center gap-4">
-          <Link href="/explore" className="text-sm font-medium text-zinc-900">Explore</Link>
+        <nav className="flex items-center gap-6">
+          <Link href="/explore" className="text-sm font-medium text-zinc-900">Registry</Link>
           <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Dashboard</Link>
+          <LoginButton />
         </nav>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full flex flex-col gap-6">
-        {/* Title + search */}
-        <div className="flex flex-col gap-4">
+      <main className="flex-1 px-6 py-10 max-w-5xl mx-auto w-full flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900">Skill Registry</h1>
-            <p className="text-sm text-zinc-500 mt-1">
-              Browse all audited Claude skills. {total > 0 && <span>{total} skill{total !== 1 ? 's' : ''} indexed.</span>}
+            <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Skill Registry</h1>
+            <p className="text-sm text-zinc-400 mt-1">
+              Audited Claude skills.{total > 0 && <span> {total} skill{total !== 1 ? 's' : ''} indexed.</span>}
             </p>
           </div>
 
-          {/* Search + filter row */}
           <form method="GET" action="/explore" className="flex flex-col sm:flex-row gap-3">
             <input
               name="q"
               defaultValue={params.q ?? ''}
               placeholder="Search by name…"
-              className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+              className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0052ff] focus:border-transparent"
             />
             <input type="hidden" name="verdict" value={params.verdict ?? 'all'} />
             <button
               type="submit"
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors"
             >
               Search
             </button>
           </form>
 
-          {/* Verdict filter pills */}
           <div className="flex items-center gap-2 flex-wrap">
             {VERDICT_FILTERS.map(f => {
               const active = (params.verdict ?? 'all') === f.value
@@ -119,7 +116,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                   href={buildUrl({ verdict: f.value, page: '1' })}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                     active
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
+                      ? 'border-[#0052ff] bg-[#0052ff] text-white'
                       : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'
                   }`}
                 >
@@ -130,7 +127,6 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
           </div>
         </div>
 
-        {/* Skill grid */}
         {skills.length === 0 ? (
           <EmptyState query={params.q} />
         ) : (
@@ -141,7 +137,6 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-zinc-100 pt-4">
             <span className="text-xs text-zinc-400">
@@ -184,7 +179,7 @@ function EmptyState({ query }: { query?: string }) {
       </p>
       <Link
         href="/dashboard/submit"
-        className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+        className="mt-2 rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors"
       >
         Submit a skill
       </Link>

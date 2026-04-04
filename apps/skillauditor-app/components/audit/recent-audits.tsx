@@ -26,7 +26,6 @@ export function RecentAudits() {
       const entries = raw ? (JSON.parse(raw) as AuditHistoryEntry[]) : []
       setHistory(entries)
 
-      // Fetch status for each
       entries.forEach(entry => {
         fetch(`/api/proxy/v1/audits/${entry.auditId}`)
           .then(r => r.json())
@@ -44,15 +43,22 @@ export function RecentAudits() {
 
   if (history.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-200 px-6 py-10 text-center">
-        <p className="text-sm text-zinc-500">No audits yet</p>
-        <p className="text-xs text-zinc-400 mt-1">Submitted audits will appear here</p>
+      <div className="rounded-xl border border-dashed border-zinc-200 px-6 py-12 text-center">
+        <p className="text-sm font-medium text-zinc-400">No audits yet</p>
+        <p className="text-xs text-zinc-300 mt-1">Submitted skills will appear here</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col divide-y divide-zinc-100 rounded-xl border border-zinc-200 overflow-hidden">
+    <div className="rounded-xl border border-zinc-200 overflow-hidden">
+      {/* Table header */}
+      <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-2.5 border-b border-zinc-100 bg-zinc-50">
+        <span className="text-xs font-medium text-zinc-400">Skill</span>
+        <span className="text-xs font-medium text-zinc-400">Status</span>
+        <span className="text-xs font-medium text-zinc-400">Time</span>
+      </div>
+
       {history.map(entry => {
         const s = statuses[entry.auditId]
         const verdict = s?.result?.verdict
@@ -63,30 +69,31 @@ export function RecentAudits() {
           <Link
             key={entry.auditId}
             href={`/audits/${entry.auditId}`}
-            className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-50 transition-colors"
+            className="grid grid-cols-[1fr_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors"
           >
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-zinc-900 truncate">{entry.skillName}</p>
-              <p className="text-xs text-zinc-400 font-mono truncate">{entry.skillHash || entry.auditId}</p>
+              <p className="text-xs text-zinc-400 font-mono truncate mt-0.5">
+                {entry.skillHash ? entry.skillHash.slice(0, 12) + '…' : entry.auditId.slice(0, 12) + '…'}
+              </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+
+            <div className="shrink-0">
               {verdict ? (
                 <VerdictPill verdict={verdict} score={score} />
               ) : status === 'pending' || status === 'running' ? (
-                <span className="text-xs text-zinc-500 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
                   <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />
                   Running
                 </span>
               ) : status === 'failed' ? (
-                <span className="text-xs text-red-500">Failed</span>
+                <span className="text-xs font-medium text-red-500">Failed</span>
               ) : (
-                <span className="text-xs text-zinc-400">—</span>
+                <span className="text-xs text-zinc-300">—</span>
               )}
-              <span className="text-xs text-zinc-400">
-                {timeAgo(entry.submittedAt)}
-              </span>
-              <span className="text-zinc-300 text-xs">›</span>
             </div>
+
+            <span className="text-xs text-zinc-400 shrink-0">{timeAgo(entry.submittedAt)}</span>
           </Link>
         )
       })}
@@ -96,10 +103,10 @@ export function RecentAudits() {
 
 function VerdictPill({ verdict, score }: { verdict: string; score?: number }) {
   const cfg = {
-    safe: 'bg-green-50 text-green-700',
-    review_required: 'bg-amber-50 text-amber-700',
-    unsafe: 'bg-red-50 text-red-700',
-  }[verdict] ?? 'bg-zinc-100 text-zinc-600'
+    safe: 'bg-green-50 text-green-700 border border-green-200',
+    review_required: 'bg-amber-50 text-amber-700 border border-amber-200',
+    unsafe: 'bg-red-50 text-red-700 border border-red-200',
+  }[verdict] ?? 'bg-zinc-100 text-zinc-600 border border-zinc-200'
 
   const label = {
     safe: 'Safe',
@@ -108,9 +115,9 @@ function VerdictPill({ verdict, score }: { verdict: string; score?: number }) {
   }[verdict] ?? verdict
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${cfg}`}>
       {label}
-      {score != null && <span className="opacity-60">· {score}</span>}
+      {score != null && <span className="opacity-50 font-normal">· {score}</span>}
     </span>
   )
 }

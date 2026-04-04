@@ -27,7 +27,7 @@ export function LoginButton() {
   return (
     <button
       onClick={login}
-      className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+      className="rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors"
     >
       Sign in
     </button>

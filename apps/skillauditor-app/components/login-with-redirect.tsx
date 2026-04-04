@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 interface LoginWithRedirectProps {
   label?: string
   redirectTo: string
+  className?: string
 }
 
-export function LoginWithRedirect({ label = 'Sign in', redirectTo }: LoginWithRedirectProps) {
+export function LoginWithRedirect({ label = 'Sign in', redirectTo, className }: LoginWithRedirectProps) {
   const { ready, authenticated, login } = usePrivy()
   const router = useRouter()
 
@@ -22,7 +23,7 @@ export function LoginWithRedirect({ label = 'Sign in', redirectTo }: LoginWithRe
   return (
     <button
       onClick={login}
-      className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+      className={className ?? 'inline-flex items-center gap-2 rounded-lg bg-[#0052ff] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0040cc] transition-colors shadow-sm'}
     >
       {label}
     </button>

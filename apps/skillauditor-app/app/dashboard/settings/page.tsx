@@ -86,17 +86,17 @@ function SettingsClient() {
     <div className="flex flex-1 flex-col">
       {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-          ← Dashboard
-        </Link>
-        <span className="text-zinc-200">|</span>
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900">SkillAuditor</Link>
+        <span className="text-zinc-200">/</span>
+        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Dashboard</Link>
+        <span className="text-zinc-200">/</span>
         <span className="text-sm font-medium text-zinc-900">Settings</span>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full flex flex-col gap-8">
+      <main className="flex-1 px-6 py-10 max-w-2xl mx-auto w-full flex flex-col gap-8">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-900">API Keys</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">API Keys</h1>
+          <p className="text-sm text-zinc-500 mt-1.5">
             Use API keys to authenticate programmatic access to the SkillAuditor API.
           </p>
         </div>
@@ -138,12 +138,12 @@ function SettingsClient() {
               placeholder="Key name (e.g. CI/CD pipeline)"
               maxLength={64}
               disabled={creating}
-              className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent disabled:opacity-50"
+              className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0052ff] focus:border-transparent disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={creating || !newKeyName.trim()}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-[#0052ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Creating…' : 'Create'}
             </button>

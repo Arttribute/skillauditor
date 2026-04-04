@@ -167,7 +167,7 @@ export function LedgerApproveModal({ skillHash }: LedgerApproveModalProps) {
               <button
                 onClick={handleApprove}
                 disabled={signing || !sessionId}
-                className="flex-1 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 rounded-xl bg-[#0052ff] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0040cc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {signing ? (
                   <span className="flex items-center justify-center gap-2">

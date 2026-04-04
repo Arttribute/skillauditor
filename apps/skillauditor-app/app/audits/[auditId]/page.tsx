@@ -10,16 +10,15 @@ export default function AuditPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Nav */}
       <header className="border-b border-zinc-100 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
-          ← Dashboard
-        </Link>
-        <span className="text-zinc-200">|</span>
-        <span className="text-sm font-medium text-zinc-900">Audit Result</span>
+        <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-900">SkillAuditor</Link>
+        <span className="text-zinc-200">/</span>
+        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">Dashboard</Link>
+        <span className="text-zinc-200">/</span>
+        <span className="text-sm font-medium text-zinc-900">Audit</span>
       </header>
 
-      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
+      <main className="flex-1 px-6 py-10 max-w-6xl mx-auto w-full">
         {auditId ? (
           <AuditResult auditId={auditId} />
         ) : (
