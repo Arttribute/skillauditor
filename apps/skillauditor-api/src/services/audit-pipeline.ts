@@ -3,6 +3,7 @@ import { runStaticAnalysis }  from './static-analyzer.js'
 import { runContentAnalysis } from './content-analyst.js'
 import { runSandboxAnalysis } from './sandbox-runner.js'
 import { runVerdictAgent }    from './verdict-agent.js'
+import { onchainRegistry }    from './onchain-registry.js'
 import { Audit } from '../db/models/audit.js'
 import { Skill } from '../db/models/skill.js'
 import type { AuditReport } from '@skillauditor/skill-types'
@@ -163,7 +164,44 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     `[audit-pipeline] ${auditId} — complete. verdict=${verdict.verdict} score=${verdict.overallScore}`,
   )
 
-  // Suppress unused variable warning — report is the canonical output record.
-  // In the next phase this will be uploaded to IPFS and its CID stored onchain.
-  void report
+  // ── Onchain stamp ─────────────────────────────────────────────────────────────
+  // Record the audit result on Base. Runs async after the audit is marked complete
+  // so the API response is never blocked. A failure here does not fail the audit —
+  // the result is already persisted in MongoDB and shown in the UI.
+  //
+  // reportCid is '' until the IPFS module is wired (Step 2 of the modular plan).
+  // The contract accepts bytes32(0) for reportCid, which we handle in the registry.
+  recordOnchain(auditId, report).catch(err => {
+    console.error(`[audit-pipeline] ${auditId} — onchain stamp failed (non-fatal):`, err.message)
+  })
+}
+
+async function recordOnchain(auditId: string, report: AuditReport): Promise<void> {
+  console.log(`[audit-pipeline] ${auditId} — recording onchain stamp…`)
+  try {
+    const { txHash } = await onchainRegistry.recordStamp({
+      skillHash:  report.skillHash,
+      verdict:    report.verdict,
+      score:      report.overallScore,
+      reportCid:  '',           // populated once IPFS module is live
+      ensSubname: '',           // populated once ENS module is live
+      nullifier:  '',
+    })
+
+    await Audit.updateOne(
+      { auditId },
+      {
+        $set: {
+          'onchain.txHash':          txHash,
+          'onchain.chainId':         Number(process.env.SKILL_REGISTRY_CHAIN_ID ?? '84532'),
+          'onchain.contractAddress': process.env.SKILL_REGISTRY_ADDRESS ?? '',
+          'onchain.stampedAt':       new Date(),
+        },
+      },
+    )
+    console.log(`[audit-pipeline] ${auditId} — onchain stamp confirmed. txHash=${txHash}`)
+  } catch (err) {
+    // Rethrow so the caller can log it as non-fatal
+    throw err
+  }
 }

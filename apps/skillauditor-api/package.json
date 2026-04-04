@@ -15,7 +15,8 @@
     "hono": "^4.12.10",
     "hono-rate-limiter": "^0.5.3",
     "mongodb": "^7.1.1",
-    "mongoose": "^9.4.1"
+    "mongoose": "^9.4.1",
+    "viem": "^2.47.10"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",
