@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { runStaticAnalysis }  from './static-analyzer.js'
 import { runContentAnalysis } from './content-analyst.js'
-import { runSandboxAnalysis } from './sandbox-runner.js'
+import { runSandboxAnalysis, type SandboxToolEvent } from './sandbox-runner.js'
 import { runVerdictAgent }    from './verdict-agent.js'
 import { onchainRegistry }    from './onchain-registry.js'
 import { Audit } from '../db/models/audit.js'
@@ -152,10 +152,32 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
   log.info('sandbox',  'Sandbox environment: 16 mock tools, honeypot credentials, synthetic filesystem')
   await log.flush()
 
+  // Live callback — fires for every tool call the sandboxed agent makes.
+  // Logs immediately and flushes so the UI can stream progress in real time.
+  const onToolCall = async (event: SandboxToolEvent) => {
+    const taskTag = `[run ${event.taskIndex + 1}/3 · ${event.taskDescription}]`
+    const flags: string[] = []
+    if (event.isNetworkAttempt) flags.push('NETWORK')
+    if (event.isScopeViolation) flags.push('SCOPE VIOLATION')
+
+    const flagStr = flags.length > 0 ? `  ⚠ ${flags.join(' · ')}` : ''
+    const methodStr = event.method ? ` (${event.method})` : ''
+    const level = event.isScopeViolation ? 'warn' : 'info'
+
+    log[level]('sandbox', `${taskTag} → ${event.toolName}${methodStr}: ${event.target}${flagStr}`)
+
+    // Show a snippet of what the mock environment returned (helps spot exfil of real secrets)
+    if (event.resultSnippet) {
+      log.info('sandbox', `  ← ${event.resultSnippet}`)
+    }
+
+    await log.flush()
+  }
+
   const t2 = Date.now()
   const [contentReport, sandboxReport] = await Promise.all([
     runContentAnalysis(input.skillContent, structuralReport),
-    runSandboxAnalysis(input.skillContent, structuralReport),
+    runSandboxAnalysis(input.skillContent, structuralReport, onToolCall),
   ])
 
   // Log content analysis results

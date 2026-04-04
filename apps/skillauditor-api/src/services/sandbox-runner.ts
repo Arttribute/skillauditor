@@ -686,6 +686,9 @@ async function runSandboxTask(
   skillContent: string,
   syntheticTask: string,
   staticReport: StaticAnalysisReport,
+  taskIndex: number = 0,
+  taskDescription: string = '',
+  onToolCall?: OnSandboxToolCall,
 ): Promise<SandboxRun & { syntheticTaskDescription: string }> {
   const runId       = randomUUID()
   const toolCallLog: ToolCallEntry[] = []
@@ -755,19 +758,34 @@ async function runSandboxTask(
       if (isNetworkAttempt) networkAttemptsCount++
       if (isFileAccess)     fileAccessCount++
 
-      if (detectScopeDeviation(block.name, input, staticReport, syntheticTask)) {
-        deviatedFromStatedPurpose = true
-      }
+      const isScopeViolation = detectScopeDeviation(block.name, input, staticReport, syntheticTask)
+      if (isScopeViolation) deviatedFromStatedPurpose = true
 
       const entry: ToolCallEntry = { tool: block.name, target, timestamp: Date.now() }
       if (method)        entry.method        = method
       if (payloadSample) entry.payloadSample = payloadSample
       toolCallLog.push(entry)
 
+      const mockResult = mockToolResult(block.name, input)
+
+      if (onToolCall) {
+        await onToolCall({
+          taskIndex,
+          taskDescription,
+          toolName:         block.name,
+          target,
+          method,
+          isNetworkAttempt,
+          isFileAccess,
+          isScopeViolation,
+          resultSnippet:    mockResult.slice(0, 120).replace(/\n/g, ' '),
+        })
+      }
+
       toolResults.push({
         type:        'tool_result',
         tool_use_id: block.id,
-        content:     mockToolResult(block.name, input),
+        content:     mockResult,
       })
     }
 
@@ -830,11 +848,30 @@ function computeConsistencyScore(runs: SandboxRun[]): number {
   return Math.max(0, Math.min(100, Math.round(score)))
 }
 
+// ── Live tool call event ───────────────────────────────────────────────────────
+// Emitted for every tool invocation during sandbox execution so callers can
+// stream real-time progress (e.g. write to pipeline logs as each call happens).
+
+export interface SandboxToolEvent {
+  taskIndex:        number
+  taskDescription:  string
+  toolName:         string
+  target:           string
+  method?:          string
+  isNetworkAttempt: boolean
+  isFileAccess:     boolean
+  isScopeViolation: boolean
+  resultSnippet:    string   // first 120 chars of the mock result
+}
+
+export type OnSandboxToolCall = (event: SandboxToolEvent) => Promise<void>
+
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export async function runSandboxAnalysis(
   skillContent: string,
   staticReport: StaticAnalysisReport,
+  onToolCall?: OnSandboxToolCall,
 ): Promise<SandboxBehaviorReport> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
@@ -842,8 +879,8 @@ export async function runSandboxAnalysis(
   const client = new Anthropic({ apiKey })
 
   const runs = await Promise.all(
-    SYNTHETIC_TASKS.map(async task => {
-      const run = await runSandboxTask(client, skillContent, task.prompt, staticReport)
+    SYNTHETIC_TASKS.map(async (task, taskIndex) => {
+      const run = await runSandboxTask(client, skillContent, task.prompt, staticReport, taskIndex, task.description, onToolCall)
       run.syntheticTaskDescription = task.description
       return run
     })
