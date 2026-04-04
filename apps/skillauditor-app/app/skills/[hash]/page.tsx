@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { SkillBadge } from '@/components/skill/skill-badge'
 import { ENSNameDisplay } from '@/components/ens/ens-name-display'
+import { SkillLedgerPanel } from '@/components/skill/skill-ledger-panel'
 import type { SkillResponse, AuditResponse } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -79,7 +80,7 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
   const audit = skill.latestAuditId ? await fetchLatestAudit(skill.latestAuditId) : null
   const findings = audit?.findings ?? []
   const shortHash = hash.slice(2, 10)
-  const ensName = skill.ensSubname ?? `${shortHash}.skills.auditor.eth`
+  const ensName = skill.ensSubname ?? `${shortHash}.skills.skillauditor.eth`
 
   return (
     <div className="flex flex-1 flex-col">
@@ -174,8 +175,8 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
           </div>
         )}
 
-        {/* Pending Ledger approvals — wired once Teammate A delivers AgentKit */}
-        <PendingApprovalsPanel hash={hash} />
+        {/* Ledger approval modal — polls for pending stamp approvals */}
+        <SkillLedgerPanel skillHash={hash} />
 
         {/* Findings summary */}
         {findings.length > 0 && (
@@ -231,20 +232,6 @@ export default async function SkillDetailPage({ params }: SkillDetailPageProps) 
   )
 }
 
-// Pending Ledger approvals panel — renders shell now; will show real data
-// once Teammate A deploys AgentKit + contracts (feat/onchain-identity).
-function PendingApprovalsPanel({ hash }: { hash: string }) {
-  // Server-rendered shell; the LedgerApproveModal (client) polls on the browser side
-  // when there are real pending approvals. Until contracts are deployed this stays quiet.
-  return (
-    <div
-      id="ledger-approvals-anchor"
-      data-skill-hash={hash}
-      // The client LedgerApproveModal mounts here and polls /v1/ledger/pending?skillHash=
-      // Blocked on feat/onchain-identity — will render nothing until AgentKit proposes a stamp
-    />
-  )
-}
 
 function StampRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (

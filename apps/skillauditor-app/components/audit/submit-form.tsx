@@ -29,6 +29,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
   const router = useRouter()
   const [skillContent, setSkillContent] = useState('')
   const [skillName, setSkillName] = useState('')
+  const [tier, setTier] = useState<'free' | 'pro'>('free')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [worldIdProof, setWorldIdProof] = useState<WorldIDProof | null>(null)
@@ -48,6 +49,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
           skillContent: skillContent.trim(),
           skillName: skillName.trim() || undefined,
           userId,
+          tier,
           // World ID 4.0 proof fields — present when verified, omitted in dev (server uses bypass)
           ...(worldIdProof && {
             proof:              worldIdProof.proof,
@@ -135,6 +137,47 @@ export function SubmitForm({ userId }: SubmitFormProps) {
             {charCount.toLocaleString()} / 500,000 chars
           </span>
         </div>
+      </div>
+
+      {/* Tier selector */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-zinc-700">Audit Tier</label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setTier('free')}
+            className={`rounded-lg border p-4 text-left transition-colors ${
+              tier === 'free'
+                ? 'border-zinc-900 bg-zinc-900 text-white'
+                : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+            }`}
+          >
+            <p className="text-sm font-semibold">Free</p>
+            <p className={`text-xs mt-0.5 ${tier === 'free' ? 'text-zinc-300' : 'text-zinc-400'}`}>
+              LLM audit · no onchain stamp
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTier('pro')}
+            className={`rounded-lg border p-4 text-left transition-colors ${
+              tier === 'pro'
+                ? 'border-zinc-900 bg-zinc-900 text-white'
+                : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+            }`}
+          >
+            <p className="text-sm font-semibold">Pro</p>
+            <p className={`text-xs mt-0.5 ${tier === 'pro' ? 'text-zinc-300' : 'text-zinc-400'}`}>
+              Full audit · onchain stamp · ENS subname
+            </p>
+          </button>
+        </div>
+        {tier === 'pro' && (
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Pro audits write a tamper-proof stamp to Base Sepolia and register an ENS subname on Ethereum Sepolia.
+            Ledger hardware approval may be requested after submission.
+          </p>
+        )}
       </div>
 
       {/* World ID verification */}
