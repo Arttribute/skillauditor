@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 
 // ── Types matching the actual API response shape ───────────────────────────────
@@ -68,6 +68,13 @@ interface AuditData {
   behavioralAnalysis?: BehavioralAnalysis
 }
 
+interface LogEntry {
+  ts: number
+  stage: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 interface AuditResultProps {
@@ -77,6 +84,8 @@ interface AuditResultProps {
 export function AuditResult({ auditId }: AuditResultProps) {
   const [data, setData] = useState<AuditData | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const lastLogTs = useRef<number>(0)
 
   const poll = useCallback(async () => {
     try {
@@ -93,11 +102,27 @@ export function AuditResult({ auditId }: AuditResultProps) {
     }
   }, [auditId])
 
+  const pollLogs = useCallback(async () => {
+    try {
+      const since = lastLogTs.current
+      const res = await fetch(`/api/proxy/v1/audits/${auditId}/logs${since > 0 ? `?since=${since}` : ''}`)
+      if (!res.ok) return
+      const body = await res.json() as { logs: LogEntry[]; total: number }
+      if (body.logs.length > 0) {
+        setLogs(prev => [...prev, ...body.logs])
+        lastLogTs.current = body.logs[body.logs.length - 1].ts
+      }
+    } catch {
+      // non-fatal — logs are best-effort
+    }
+  }, [auditId])
+
   useEffect(() => {
     void poll()
-  }, [poll])
+    void pollLogs()
+  }, [poll, pollLogs])
 
-  // Poll while pending/running
+  // Poll audit status while pending/running
   useEffect(() => {
     if (!data) return
     if (data.status === 'completed' || data.status === 'failed') return
@@ -105,6 +130,20 @@ export function AuditResult({ auditId }: AuditResultProps) {
     const timer = setInterval(() => { void poll() }, 3000)
     return () => clearInterval(timer)
   }, [data, poll])
+
+  // Poll logs while pending/running; do a final fetch on completion
+  useEffect(() => {
+    if (!data) return
+
+    if (data.status === 'completed' || data.status === 'failed') {
+      // One final fetch to capture any logs flushed just before completion
+      void pollLogs()
+      return
+    }
+
+    const timer = setInterval(() => { void pollLogs() }, 2000)
+    return () => clearInterval(timer)
+  }, [data, pollLogs])
 
   // ── Fetch error ──────────────────────────────────────────────────────────────
   if (fetchError) {
@@ -121,7 +160,7 @@ export function AuditResult({ auditId }: AuditResultProps) {
 
   // ── Pipeline running ─────────────────────────────────────────────────────────
   if (data.status === 'pending' || data.status === 'running') {
-    return <AuditRunning auditId={auditId} status={data.status} skillName={data.skillName} />
+    return <AuditRunning auditId={auditId} status={data.status} skillName={data.skillName} logs={logs} />
   }
 
   // ── Failed ───────────────────────────────────────────────────────────────────
@@ -141,6 +180,7 @@ export function AuditResult({ auditId }: AuditResultProps) {
             Resubmit
           </Link>
         </div>
+        {logs.length > 0 && <LogsPanel logs={logs} />}
       </div>
     )
   }
@@ -195,6 +235,9 @@ export function AuditResult({ auditId }: AuditResultProps) {
 
       {/* Behavioral summary */}
       {behavioralAnalysis && <BehavioralPanel behavioral={behavioralAnalysis} />}
+
+      {/* Pipeline logs */}
+      {logs.length > 0 && <LogsPanel logs={logs} defaultOpen={false} />}
 
       {/* Meta footer */}
       <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-100 flex flex-wrap gap-x-6 gap-y-1">
@@ -407,6 +450,77 @@ function BehavioralPanel({ behavioral }: { behavioral: BehavioralAnalysis }) {
   )
 }
 
+// ── Logs panel ─────────────────────────────────────────────────────────────────
+
+const STAGE_COLORS: Record<string, string> = {
+  structural: 'text-sky-400',
+  content:    'text-violet-400',
+  sandbox:    'text-orange-400',
+  verdict:    'text-emerald-400',
+  onchain:    'text-blue-400',
+  pipeline:   'text-zinc-400',
+}
+
+const LEVEL_COLORS: Record<string, string> = {
+  info:  'text-zinc-300',
+  warn:  'text-amber-400',
+  error: 'text-red-400',
+}
+
+function LogsPanel({ logs, defaultOpen = true }: { logs: LogEntry[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom as new logs arrive
+  useEffect(() => {
+    if (open && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [logs, open])
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-900 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-zinc-500" />
+          <span className="text-xs font-mono font-medium text-zinc-300">Pipeline Logs</span>
+          <span className="text-xs text-zinc-600 font-mono">{logs.length} lines</span>
+        </div>
+        <span className="text-zinc-600 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto max-h-96 px-4 pb-4 pt-1"
+        >
+          {logs.map((entry, i) => {
+            const time = new Date(entry.ts).toISOString().slice(11, 23) // HH:MM:SS.mmm
+            const stageColor = STAGE_COLORS[entry.stage] ?? 'text-zinc-500'
+            const levelColor = LEVEL_COLORS[entry.level] ?? 'text-zinc-300'
+            return (
+              <div key={i} className="flex items-start gap-2 py-0.5 font-mono text-xs leading-5 min-w-0">
+                <span className="text-zinc-600 shrink-0 select-none">{time}</span>
+                <span className={`shrink-0 w-14 ${stageColor}`}>{entry.stage}</span>
+                {entry.level !== 'info' && (
+                  <span className={`shrink-0 uppercase text-[10px] font-bold ${levelColor}`}>{entry.level}</span>
+                )}
+                <span className={`break-all ${levelColor}`}>{entry.message}</span>
+              </div>
+            )
+          })}
+          {logs.length === 0 && (
+            <p className="text-xs text-zinc-600 font-mono py-2">Waiting for pipeline to start…</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Stat({ label, value, valueClass = 'text-zinc-900' }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -435,7 +549,7 @@ const STAGES = [
   { key: 'stage4', label: 'Verdict Synthesis', desc: 'Aggregating findings into a final safety verdict' },
 ]
 
-function AuditRunning({ auditId, status, skillName }: { auditId: string; status: AuditStatus; skillName: string }) {
+function AuditRunning({ auditId, status, skillName, logs }: { auditId: string; status: AuditStatus; skillName: string; logs: LogEntry[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -470,6 +584,8 @@ function AuditRunning({ auditId, status, skillName }: { auditId: string; status:
           ))}
         </div>
       </div>
+
+      <LogsPanel logs={logs} defaultOpen={true} />
     </div>
   )
 }

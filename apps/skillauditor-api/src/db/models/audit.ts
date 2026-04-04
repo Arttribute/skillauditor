@@ -1,5 +1,12 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
+const logEntrySchema = new Schema({
+  ts:      { type: Number, required: true },
+  stage:   { type: String, required: true },
+  level:   { type: String, enum: ['info', 'warn', 'error'], required: true },
+  message: { type: String, required: true },
+}, { _id: false })
+
 const toolCallEntrySchema = new Schema({
   tool:          { type: String, required: true },
   target:        { type: String, required: true },
@@ -76,6 +83,8 @@ const auditSchema = new Schema(
       ensSubname:       { type: String, default: null },
       stampedAt:        { type: Date, default: null },
     },
+
+    logs: { type: [logEntrySchema], default: [] },
 
     completedAt: { type: Date, default: null },
   },

@@ -59,4 +59,23 @@ audits.get('/:auditId', async (c) => {
   })
 })
 
+// GET /v1/audits/:auditId/logs — stream pipeline logs for the running or completed audit.
+// Optional ?since=<unix_ms> to return only entries newer than that timestamp (for
+// incremental polling while the audit is in flight).
+audits.get('/:auditId/logs', async (c) => {
+  const { auditId } = c.req.param()
+  const since = Number(c.req.query('since') ?? 0)
+
+  const audit = await Audit.findOne({ auditId }, { logs: 1, status: 1 }).lean()
+  if (!audit) {
+    return c.json({ error: 'Audit not found' }, 404)
+  }
+
+  const doc = audit as Record<string, unknown>
+  const allLogs = (doc.logs ?? []) as Array<{ ts: number; stage: string; level: string; message: string }>
+  const logs = since > 0 ? allLogs.filter(l => l.ts > since) : allLogs
+
+  return c.json({ logs, total: allLogs.length, status: doc.status })
+})
+
 export default audits

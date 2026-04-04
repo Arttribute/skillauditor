@@ -19,6 +19,44 @@ export interface SubmissionInput {
   tier: 'free' | 'pro'
 }
 
+// ── Pipeline logger ────────────────────────────────────────────────────────────
+// Buffers log entries in memory during pipeline execution and flushes them to
+// MongoDB incrementally so the UI can stream progress while the audit is running.
+
+type LogLevel = 'info' | 'warn' | 'error'
+
+interface LogEntry {
+  ts:      number
+  stage:   string
+  level:   LogLevel
+  message: string
+}
+
+class PipelineLogger {
+  private buffer: LogEntry[] = []
+
+  constructor(private auditId: string) {}
+
+  info(stage: string, message: string)  { this.emit('info',  stage, message) }
+  warn(stage: string, message: string)  { this.emit('warn',  stage, message) }
+  error(stage: string, message: string) { this.emit('error', stage, message) }
+
+  private emit(level: LogLevel, stage: string, message: string) {
+    const entry: LogEntry = { ts: Date.now(), stage, level, message }
+    this.buffer.push(entry)
+    console.log(`[audit-pipeline] [${this.auditId}] [${stage}] ${level.toUpperCase()}: ${message}`)
+  }
+
+  async flush(): Promise<void> {
+    if (!this.buffer.length) return
+    const toFlush = this.buffer.splice(0)
+    await Audit.updateOne(
+      { auditId: this.auditId },
+      { $push: { logs: { $each: toFlush } } },
+    )
+  }
+}
+
 // ── Pipeline entry point ───────────────────────────────────────────────────────
 // Returns auditId immediately — pipeline runs async. Caller polls /v1/audits/:auditId.
 
@@ -58,11 +96,28 @@ export async function startAuditPipeline(input: SubmissionInput): Promise<string
 //  Stage 4: Verdict Agent  (LLM, never sees raw skill)
 
 async function runPipeline(auditId: string, input: SubmissionInput): Promise<void> {
+  const log = new PipelineLogger(auditId)
   await Audit.updateOne({ auditId }, { $set: { status: 'running' } })
 
   // ── Stage 1: Structural Extraction ───────────────────────────────────────────
-  console.log(`[audit-pipeline] ${auditId} — stage 1: structural extraction`)
+  log.info('structural', `Starting structural extraction — ${input.skillContent.length} bytes`)
+  const t1 = Date.now()
   const structuralReport = runStaticAnalysis(input.skillContent)
+
+  log.info('structural', `Content hash: ${structuralReport.hash}`)
+  log.info('structural', `Lines: ${structuralReport.lineCount} · External URLs: ${structuralReport.externalUrls.length} · Contains scripts: ${structuralReport.containsScripts}`)
+  if (structuralReport.frontmatter.name) {
+    log.info('structural', `Frontmatter — name: "${structuralReport.frontmatter.name}" version: ${structuralReport.frontmatter.version ?? 'unset'}`)
+  }
+  if (structuralReport.declaredCapabilities.length > 0) {
+    log.info('structural', `Declared capabilities: ${structuralReport.declaredCapabilities.join(', ')}`)
+  }
+  if (structuralReport.externalUrls.length > 0) {
+    for (const url of structuralReport.externalUrls) {
+      log.warn('structural', `External URL detected: ${url}`)
+    }
+  }
+  log.info('structural', `Stage 1 complete (${Date.now() - t1}ms)`)
 
   await Audit.updateOne(
     { auditId },
@@ -89,15 +144,56 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     { upsert: true },
   )
 
-  // ── Stages 2 + 3: Content Analysis and Sandbox — run in parallel ─────────────
-  // Content analyst reads raw skill. Sandbox runner executes it with mock tools.
-  // Neither depends on the other — run concurrently to halve elapsed time.
-  console.log(`[audit-pipeline] ${auditId} — stages 2+3: content analysis + sandbox (parallel)`)
+  await log.flush()
 
+  // ── Stages 2 + 3: Content Analysis and Sandbox — run in parallel ─────────────
+  log.info('content',  'Starting content analysis — examining skill instructions for injection and deception patterns')
+  log.info('sandbox',  'Starting sandbox simulation — executing skill with mock tools in isolated environment')
+  log.info('sandbox',  'Sandbox environment: 16 mock tools, honeypot credentials, synthetic filesystem')
+  await log.flush()
+
+  const t2 = Date.now()
   const [contentReport, sandboxReport] = await Promise.all([
     runContentAnalysis(input.skillContent, structuralReport),
     runSandboxAnalysis(input.skillContent, structuralReport),
   ])
+
+  // Log content analysis results
+  const contentFindings = (contentReport as { findings?: unknown[] }).findings ?? []
+  log.info('content', `Content analysis complete (${Date.now() - t2}ms) — ${contentFindings.length} finding(s)`)
+  if ((contentReport as { deceptionRisk?: number }).deceptionRisk !== undefined) {
+    const risk = (contentReport as { deceptionRisk: number }).deceptionRisk
+    if (risk > 50) {
+      log.warn('content', `Elevated deception risk score: ${risk}/100`)
+    }
+  }
+
+  // Log sandbox results
+  const runs = (sandboxReport as { runs?: unknown[] }).runs ?? []
+  const exfilAttempts = (sandboxReport as { exfiltrationAttempts?: number }).exfiltrationAttempts ?? 0
+  const scopeViolations = (sandboxReport as { scopeViolations?: number }).scopeViolations ?? 0
+  const consistency = (sandboxReport as { consistencyScore?: number }).consistencyScore ?? 100
+
+  log.info('sandbox', `Sandbox simulation complete — ${runs.length} run(s)`)
+
+  // Count total tool calls across all runs
+  const totalToolCalls = runs.reduce((sum, r) => {
+    const run = r as { toolCallLog?: unknown[] }
+    return sum + (run.toolCallLog?.length ?? 0)
+  }, 0)
+  log.info('sandbox', `Tool calls observed: ${totalToolCalls}`)
+
+  if (exfilAttempts > 0) {
+    log.warn('sandbox', `Exfiltration attempts detected: ${exfilAttempts}`)
+  } else {
+    log.info('sandbox', 'No exfiltration attempts detected')
+  }
+  if (scopeViolations > 0) {
+    log.warn('sandbox', `Scope violations: ${scopeViolations}`)
+  } else {
+    log.info('sandbox', 'No scope violations detected')
+  }
+  log.info('sandbox', `Behavioral consistency score: ${consistency}/100`)
 
   await Audit.updateOne(
     { auditId },
@@ -109,10 +205,27 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     },
   )
 
+  await log.flush()
+
   // ── Stage 4: Verdict Agent ────────────────────────────────────────────────────
-  // Receives all three reports — NEVER the raw skill content.
-  console.log(`[audit-pipeline] ${auditId} — stage 4: verdict agent`)
+  log.info('verdict', 'Starting verdict synthesis — aggregating structural, content, and behavioral reports')
+  log.info('verdict', 'Verdict agent operates on reports only — never sees raw skill content')
+  await log.flush()
+
+  const t4 = Date.now()
   const verdict = await runVerdictAgent(structuralReport, contentReport, sandboxReport)
+
+  log.info('verdict', `Verdict: ${verdict.verdict.toUpperCase()} · Score: ${verdict.overallScore}/100 (${Date.now() - t4}ms)`)
+  if (verdict.findings?.length > 0) {
+    log.info('verdict', `${verdict.findings.length} finding(s) consolidated into final report`)
+    const critical = verdict.findings.filter((f: { severity: string }) => f.severity === 'critical').length
+    const high = verdict.findings.filter((f: { severity: string }) => f.severity === 'high').length
+    if (critical > 0) log.warn('verdict', `${critical} critical finding(s)`)
+    if (high > 0)     log.warn('verdict', `${high} high-severity finding(s)`)
+  }
+  if (verdict.recommendation) {
+    log.info('verdict', `Recommendation: ${verdict.recommendation}`)
+  }
 
   // ── Assemble full report ──────────────────────────────────────────────────────
   const report: AuditReport = {
@@ -131,6 +244,8 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     behavioralAnalysis:       sandboxReport,
     recommendation:           verdict.recommendation,
   }
+
+  log.info('pipeline', 'Audit complete — persisting results')
 
   // ── Persist completed state ───────────────────────────────────────────────────
   await Promise.all([
@@ -159,31 +274,25 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
     ),
   ])
 
-  console.log(
-    `[audit-pipeline] ${auditId} — complete. verdict=${verdict.verdict} score=${verdict.overallScore}`,
-  )
+  await log.flush()
 
   // ── Onchain stamp ─────────────────────────────────────────────────────────────
-  // Record the audit result on Base. Runs async after the audit is marked complete
-  // so the API response is never blocked. A failure here does not fail the audit —
-  // the result is already persisted in MongoDB and shown in the UI.
-  //
-  // reportCid is '' until the IPFS module is wired (Step 2 of the modular plan).
-  // The contract accepts bytes32(0) for reportCid, which we handle in the registry.
-  recordOnchain(auditId, report).catch(err => {
+  recordOnchain(auditId, report, log).catch(err => {
     console.error(`[audit-pipeline] ${auditId} — onchain stamp failed (non-fatal):`, err.message)
   })
 }
 
-async function recordOnchain(auditId: string, report: AuditReport): Promise<void> {
-  console.log(`[audit-pipeline] ${auditId} — recording onchain stamp…`)
+async function recordOnchain(auditId: string, report: AuditReport, log: PipelineLogger): Promise<void> {
+  log.info('onchain', 'Recording audit stamp on Base…')
+  await log.flush()
+
   try {
     const { txHash } = await onchainRegistry.recordStamp({
       skillHash:  report.skillHash,
       verdict:    report.verdict,
       score:      report.overallScore,
-      reportCid:  '',           // populated once IPFS module is live
-      ensSubname: '',           // populated once ENS module is live
+      reportCid:  '',
+      ensSubname: '',
       nullifier:  '',
     })
 
@@ -198,9 +307,10 @@ async function recordOnchain(auditId: string, report: AuditReport): Promise<void
         },
       },
     )
-    console.log(`[audit-pipeline] ${auditId} — onchain stamp confirmed. txHash=${txHash}`)
+
+    log.info('onchain', `Onchain stamp confirmed — txHash: ${txHash}`)
+    await log.flush()
   } catch (err) {
-    // Rethrow so the caller can log it as non-fatal
     throw err
   }
 }
