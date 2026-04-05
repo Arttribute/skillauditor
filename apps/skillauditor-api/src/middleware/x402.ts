@@ -16,8 +16,8 @@
 
 import { createMiddleware } from 'hono/factory'
 
-// $5.00 USDC — full Pro audit with onchain stamp + ENS subname
-const PRO_AUDIT_AMOUNT_USDC      = '5000000'
+// $1.00 USDC — full Pro audit with onchain stamp + ENS subname
+const PRO_AUDIT_AMOUNT_USDC      = '1000000'
 
 // $0.10 USDC — micropayment for free tier after the 3/month quota is exhausted
 const FREE_OVERFLOW_AMOUNT_USDC  = '100000'
@@ -47,7 +47,7 @@ function buildProPaymentRequirements(resourceUrl: string) {
         network:            X402_NETWORK,
         maxAmountRequired:  PRO_AUDIT_AMOUNT_USDC,
         resource:           resourceUrl,
-        description:        'Pro skill audit — semantic analysis + onchain stamp + ENS subname',
+        description:        'Pro skill audit — semantic analysis + onchain stamp + ENS subname ($1.00 USDC)',
         mimeType:           'application/json',
         payTo:              TREASURY_ADDRESS,
         maxTimeoutSeconds:  300,

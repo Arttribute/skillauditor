@@ -64,7 +64,7 @@ const HELP = `
 
 \x1b[1mWORLD AGENTKIT (Pro tier)\x1b[0m
   Pro audits require a World ID-verified agent wallet. The payment is
-  automatically handled via the x402 protocol ($9 USDC on Base).
+  automatically handled via the x402 protocol ($1.00 USDC on Base).
 
   1. Register your wallet: npx @worldcoin/agentkit-cli register <address>
   2. Fund it with USDC on Base (or Base Sepolia for testnet)

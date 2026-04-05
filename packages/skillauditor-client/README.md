@@ -239,4 +239,4 @@ The auditor agent never reads raw skill content as instructions — it only sees
 | Onchain stamp (Base) | — | ✔ |
 | ENS subname (`*.skills.skillauditor.eth`) | — | ✔ |
 | IPFS audit report | — | ✔ |
-| Payment required | No | $9 USDC via x402 |
+| Payment required | No | $1.00 USDC via x402 |
