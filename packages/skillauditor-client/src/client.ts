@@ -114,7 +114,7 @@ export class SkillAuditorClient {
   private readonly rejectOnUnsafe: boolean
 
   constructor(opts: SkillAuditorClientOptions = {}) {
-    this.apiUrl         = (opts.apiUrl ?? 'http://localhost:3001').replace(/\/$/, '')
+    this.apiUrl         = (opts.apiUrl ?? process.env.SKILLAUDITOR_API_URL ?? 'https://api.skillauditor.dev').replace(/\/$/, '')
     this.privateKey     = opts.privateKey ?? 'dev'
     this.tier           = opts.tier ?? 'free'
     this.paymentHandler = opts.paymentHandler
