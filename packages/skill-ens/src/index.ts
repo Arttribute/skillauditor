@@ -45,11 +45,13 @@ const REGISTRAR_ABI = [
         name: 'record',
         type: 'tuple',
         components: [
-          { name: 'verdict',   type: 'string' },
-          { name: 'score',     type: 'uint8'  },
-          { name: 'reportCid', type: 'string' },
-          { name: 'skillName', type: 'string' },
-          { name: 'auditor',   type: 'string' },
+          { name: 'verdict',    type: 'string' },
+          { name: 'score',      type: 'uint8'  },
+          { name: 'reportCid',  type: 'string' },
+          { name: 'skillName',  type: 'string' },
+          { name: 'auditor',    type: 'string' },
+          { name: 'auditId',    type: 'string' },
+          { name: 'baseTxHash', type: 'string' },
         ],
       },
     ],
@@ -64,21 +66,16 @@ const REGISTRAR_ABI = [
     name: 'resolveSkill',
     inputs: [{ name: 'subnameNode', type: 'bytes32' }],
     outputs: [
-      { name: 'verdict',   type: 'string' },
-      { name: 'score',     type: 'string' },
-      { name: 'reportCid', type: 'string' },
-      { name: 'auditedAt', type: 'string' },
-      { name: 'auditor',   type: 'string' },
-      { name: 'skillName', type: 'string' },
-      { name: 'skillHash', type: 'string' },
+      { name: 'verdict',     type: 'string' },
+      { name: 'score',       type: 'string' },
+      { name: 'reportCid',   type: 'string' },
+      { name: 'auditedAt',   type: 'string' },
+      { name: 'auditor',     type: 'string' },
+      { name: 'skillName',   type: 'string' },
+      { name: 'skillHash',   type: 'string' },
+      { name: 'auditId',     type: 'string' },
+      { name: 'baseTxHash',  type: 'string' },
     ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'subnameNodeOf',
-    inputs: [{ name: 'skillHash', type: 'bytes32' }],
-    outputs: [{ name: '', type: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -86,7 +83,7 @@ const REGISTRAR_ABI = [
     name: 'ensNameOf',
     inputs: [{ name: 'skillHash', type: 'bytes32' }],
     outputs: [{ name: '', type: 'string' }],
-    stateMutability: 'pure',
+    stateMutability: 'view',
   },
 ] as const
 
@@ -143,11 +140,16 @@ function namehash(name: string): Hex {
   return `0x${Buffer.from(node).toString('hex')}` as Hex
 }
 
-/** Derive `{hash8}.skills.auditor.eth` ENS name from a skill hash. */
+/**
+ * Derive ENS name from a skill hash.
+ * Returns `{hash8}.skills.skillauditor.eth` as the fallback.
+ * The actual registered name may include a skill-name slug (e.g. `github-pr-reviewer-{hash8}...`);
+ * use `ensNameOf(skillHash)` on the contract for the canonical registered name.
+ */
 function skillHashToEnsName(skillHash: string): string {
   const clean = skillHash.startsWith('0x') ? skillHash.slice(2) : skillHash
   const h8    = clean.slice(0, 8).toLowerCase()
-  return `${h8}.skills.auditor.eth`
+  return `${h8}.skills.skillauditor.eth`
 }
 
 function toBytes32(hex: string): Hex {
@@ -221,16 +223,38 @@ export class SkillENSClient implements IENSRegistry {
       args: [
         toBytes32(skillHash),
         {
-          verdict:   verdictData.verdict,
-          score:     Math.max(0, Math.min(100, Math.round(verdictData.score))),
-          reportCid: verdictData.reportCid ?? '',
-          skillName: verdictData.skillName ?? '',
-          auditor:   verdictData.auditorEns ?? '',
+          verdict:    verdictData.verdict,
+          score:      Math.max(0, Math.min(100, Math.round(verdictData.score))),
+          reportCid:  verdictData.reportCid ?? '',
+          skillName:  verdictData.skillName ?? '',
+          auditor:    verdictData.auditorEns ?? '',
+          auditId:    verdictData.auditId    ?? '',
+          baseTxHash: verdictData.baseTxHash ?? '',
         },
       ],
       account,
       chain: this.chain,
     })
+
+    // Simulate to get the return value (ensName) before broadcasting
+    const { result } = await public_.simulateContract({
+      address:      registrar,
+      abi:          REGISTRAR_ABI,
+      functionName: 'registerSubname',
+      args: [
+        toBytes32(skillHash),
+        {
+          verdict:    verdictData.verdict,
+          score:      Math.max(0, Math.min(100, Math.round(verdictData.score))),
+          reportCid:  verdictData.reportCid ?? '',
+          skillName:  verdictData.skillName ?? '',
+          auditor:    verdictData.auditorEns ?? '',
+          auditId:    verdictData.auditId    ?? '',
+          baseTxHash: verdictData.baseTxHash ?? '',
+        },
+      ],
+      account,
+    }).catch(() => ({ result: [null, null] as unknown as readonly [Hex, string] }))
 
     const receipt = await public_.waitForTransactionReceipt({
       hash:            txHash,
@@ -243,9 +267,8 @@ export class SkillENSClient implements IENSRegistry {
       throw new Error(`registerSubname tx reverted: ${txHash}`)
     }
 
-    // Decode the ensName from the return value via event / return data
-    // Fall back to computing locally (matches on-chain logic)
-    const ensName = skillHashToEnsName(skillHash)
+    // Use the simulated return value if available, else fall back to local computation
+    const ensName = (result?.[1] as string | null | undefined) || skillHashToEnsName(skillHash)
     console.log(`[skill-ens] registered ${ensName} tx=${txHash}`)
     return ensName
   }
@@ -264,7 +287,7 @@ export class SkillENSClient implements IENSRegistry {
         abi:          REGISTRAR_ABI,
         functionName: 'resolveSkill',
         args:         [subnameNode],
-      }) as [string, string, string, string, string, string, string]
+      }) as unknown as [string, string, string, string, string, string, string, string, string]
 
       const [verdict, score, reportCid, auditedAt, auditor, skillName] = result
       if (!verdict) return null
