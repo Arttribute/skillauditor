@@ -48,6 +48,14 @@ interface BehavioralAnalysis {
   runs?: unknown[]
 }
 
+interface OnchainStamp {
+  txHash: string
+  chainId: number
+  contractAddress: string
+  ensSubname: string | null
+  ipfsCid: string | null
+}
+
 interface AuditData {
   auditId: string
   skillHash: string
@@ -66,6 +74,7 @@ interface AuditData {
   recommendation?: string
   structuralAnalysis?: StructuralAnalysis
   behavioralAnalysis?: BehavioralAnalysis
+  stamp?: OnchainStamp | null
 }
 
 interface LogEntry {
@@ -263,6 +272,13 @@ export function AuditResult({ auditId }: AuditResultProps) {
               </div>
             </div>
           </div>
+
+          {/* Onchain stamp (Pro tier) */}
+          {data.stamp ? (
+            <OnchainStampPanel stamp={data.stamp} />
+          ) : data.tier === 'pro' && (
+            <RecordOnchainButton auditId={auditId} onSuccess={() => void poll()} />
+          )}
 
           {/* Structural analysis */}
           {structuralAnalysis && <StructuralPanel structural={structuralAnalysis} />}
@@ -651,5 +667,115 @@ function PulsingDot() {
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-zinc-400 opacity-50" />
       <span className="relative inline-flex rounded-full h-3 w-3 bg-zinc-600" />
     </span>
+  )
+}
+
+function OnchainStampPanel({ stamp }: { stamp: NonNullable<AuditData['stamp']> }) {
+  return (
+    <div className="rounded-xl border border-[#dbeafe] bg-[#f0f7ff] p-5 flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center justify-center h-6 w-6 rounded-full bg-[#0052ff]">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+        <span className="text-sm font-semibold text-[#0040cc]">Onchain Verified</span>
+      </div>
+      <div className="flex flex-col gap-2 text-xs">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[#5b84c4] font-medium">Network</span>
+          <span className="font-medium text-zinc-700">Base Sepolia ({stamp.chainId})</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[#5b84c4] font-medium">Transaction</span>
+          <a
+            href={`https://sepolia.basescan.org/tx/${stamp.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[#0052ff] break-all hover:underline"
+          >
+            {stamp.txHash}
+          </a>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[#5b84c4] font-medium">Contract</span>
+          <a
+            href={`https://sepolia.basescan.org/address/${stamp.contractAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[#0052ff] break-all hover:underline"
+          >
+            {stamp.contractAddress}
+          </a>
+        </div>
+        {stamp.ensSubname && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[#5b84c4] font-medium">ENS Identity</span>
+            <a
+              href={`https://app.ens.domains/${stamp.ensSubname}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[#0052ff] break-all hover:underline"
+            >
+              {stamp.ensSubname}
+            </a>
+          </div>
+        )}
+        {stamp.ipfsCid && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[#5b84c4] font-medium">IPFS Report</span>
+            <span className="font-mono text-zinc-600 break-all">{stamp.ipfsCid}</span>
+          </div>
+        )}
+      </div>
+      <a
+        href={`https://sepolia.basescan.org/tx/${stamp.txHash}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs font-medium text-[#0052ff] hover:underline"
+      >
+        View on BaseScan →
+      </a>
+    </div>
+  )
+}
+
+function RecordOnchainButton({ auditId, onSuccess }: { auditId: string; onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleClick = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/proxy/v1/audits/${auditId}/record-onchain`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        setError(body.error ?? `Failed (HTTP ${res.status})`)
+      } else {
+        onSuccess()
+      }
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-zinc-200 p-5 flex flex-col gap-3">
+      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Onchain Stamp</p>
+      <p className="text-xs text-zinc-400 leading-relaxed">
+        Pro audit — record verdict and ENS subname on Base Sepolia.
+      </p>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button
+        onClick={() => void handleClick()}
+        disabled={loading}
+        className="rounded-lg bg-[#0052ff] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0040cc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-start"
+      >
+        {loading ? 'Recording…' : 'Record Onchain + Register ENS'}
+      </button>
+    </div>
   )
 }

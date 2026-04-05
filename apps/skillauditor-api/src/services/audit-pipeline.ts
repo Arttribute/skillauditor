@@ -86,6 +86,51 @@ export async function startAuditPipeline(input: SubmissionInput): Promise<string
   return auditId
 }
 
+// ── Trigger onchain recording for an existing completed audit ──────────────────
+// Called from POST /v1/audits/:auditId/record-onchain as a retry mechanism.
+
+export async function triggerOnchainRecord(auditId: string): Promise<void> {
+  const audit = await Audit.findOne({ auditId }).lean()
+  if (!audit) throw new Error('Audit not found')
+
+  const doc = audit as Record<string, unknown>
+  if (doc.status !== 'completed') throw new Error('Audit is not completed')
+  if (doc.tier !== 'pro') throw new Error('Onchain recording is only available for Pro tier')
+
+  const onchain = doc.onchain as Record<string, unknown> | undefined
+  if (onchain?.txHash) throw new Error('Audit already has an onchain stamp')
+
+  const result   = doc.result   as Record<string, unknown> | undefined
+  const pipeline = doc.pipeline as Record<string, unknown> | undefined
+  const verdictData = pipeline?.verdict as Record<string, unknown> | undefined
+
+  // Reconstruct the minimal AuditReport needed by recordOnchain
+  const report: AuditReport = {
+    version:                  '1.0.0',
+    skillHash:                doc.skillHash as string,
+    skillName:                doc.skillName as string,
+    auditedAt:                (doc.completedAt as Date | undefined)?.toISOString() ?? new Date().toISOString(),
+    auditorAgent:             'skillauditor-api/v1',
+    worldIdVerificationLevel: (doc.submittedBy as Record<string, unknown>)?.worldIdVerificationLevel as 'orb' | 'device' ?? 'device',
+    verdict:                  result?.verdict as AuditReport['verdict'],
+    overallScore:             result?.score as number ?? 0,
+    dimensions:               verdictData?.dimensions as AuditReport['dimensions'],
+    findings:                 (doc.findings ?? []) as AuditReport['findings'],
+    structuralAnalysis:       pipeline?.structuralAnalysis as AuditReport['structuralAnalysis'],
+    contentAnalysis:          pipeline?.contentAnalysis as AuditReport['contentAnalysis'],
+    behavioralAnalysis:       pipeline?.sandboxRuns as AuditReport['behavioralAnalysis'],
+    recommendation:           (verdictData?.recommendation as string | undefined) ?? '',
+    reportCid:                result?.reportCid as string | undefined,
+  }
+
+  const nullifier  = (doc.submittedBy as Record<string, unknown>)?.worldIdNullifier as string ?? ''
+  const skillName  = doc.skillName as string
+  const skillHash  = doc.skillHash as string
+  const log        = new PipelineLogger(auditId)
+
+  await recordOnchain(auditId, skillHash, report, nullifier, skillName, log)
+}
+
 // ── Four-stage pipeline ────────────────────────────────────────────────────────
 //
 //  Stage 1: Structural Extraction  (sync, no LLM)
@@ -320,14 +365,17 @@ async function runPipeline(auditId: string, input: SubmissionInput): Promise<voi
 
   await log.flush()
 
-  // ── Onchain stamp ─────────────────────────────────────────────────────────────
-  recordOnchain(auditId, report, input.submittedBy.worldIdNullifier, input.skillName, log).catch(err => {
-    console.error(`[audit-pipeline] ${auditId} — onchain stamp failed (non-fatal):`, err.message)
-  })
+  // ── Onchain stamp (Pro tier only) ────────────────────────────────────────────
+  if (input.tier === 'pro') {
+    recordOnchain(auditId, structuralReport.hash, report, input.submittedBy.worldIdNullifier, input.skillName, log).catch(err => {
+      console.error(`[audit-pipeline] ${auditId} — onchain stamp failed (non-fatal):`, err.message)
+    })
+  }
 }
 
 async function recordOnchain(
   auditId:   string,
+  skillHash: string,
   report:    AuditReport,
   nullifier: string,
   skillName: string,
@@ -394,10 +442,16 @@ async function recordOnchain(
       nullifier,
     })
 
-    await Audit.updateOne(
-      { auditId },
-      { $set: { 'onchain.ensName': ensName } },
-    )
+    await Promise.all([
+      Audit.updateOne(
+        { auditId },
+        { $set: { 'onchain.ensSubname': ensName } },
+      ),
+      Skill.updateOne(
+        { hash: skillHash },
+        { $set: { ensSubname: ensName } },
+      ),
+    ])
 
     log.info('onchain', `ENS subname registered — ${ensName}`)
     await log.flush()
