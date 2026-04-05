@@ -65,7 +65,7 @@ export const ensRegistry: IENSRegistry = {
       const h8 = skillHash.startsWith('0x')
         ? skillHash.slice(2, 10)
         : skillHash.slice(0, 8)
-      const ensName = `${h8.toLowerCase()}.skills.auditor.eth`
+      const ensName = `${h8.toLowerCase()}.skills.skillauditor.eth`
       console.warn(
         `[ens-registry] SKILL_SUBNAME_REGISTRAR_ADDRESS not set — ` +
         `returning stub ENS name: ${ensName}`,

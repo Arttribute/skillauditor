@@ -28,6 +28,8 @@ export interface VerdictData {
   auditorEns: string;
   skillName: string;
   version: string;
+  auditId?: string;            // SkillAuditor audit UUID
+  baseTxHash?: string;         // txHash from SkillRegistry.recordStamp on Base Sepolia
 }
 
 export interface ENSAuditRecord {

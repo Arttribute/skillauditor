@@ -94,9 +94,10 @@ contract DeployScript is Script {
         bool    skipRegistrar   = vm.envOr("SKIP_REGISTRAR", false);
 
         // ENS vars — default to Ethereum Sepolia values
-        address ensRegistry = vm.envOr("ENS_REGISTRY_ADDRESS", ENS_REGISTRY_SEPOLIA);
-        address ensResolver = vm.envOr("ENS_RESOLVER_ADDRESS", ENS_RESOLVER_SEPOLIA);
-        bytes32 ensRootNode = vm.envOr("ENS_ROOT_NODE", bytes32(0));
+        address ensRegistry  = vm.envOr("ENS_REGISTRY_ADDRESS", ENS_REGISTRY_SEPOLIA);
+        address ensResolver  = vm.envOr("ENS_RESOLVER_ADDRESS", ENS_RESOLVER_SEPOLIA);
+        bytes32 ensRootNode  = vm.envOr("ENS_ROOT_NODE", bytes32(0));
+        string  memory ensParentName = vm.envOr("ENS_PARENT_NAME", string("skills.skillauditor.eth"));
 
         bool deployRegistrar = !skipRegistrar && ensRootNode != bytes32(0);
 
@@ -128,7 +129,8 @@ contract DeployScript is Script {
                 ensRootNode,
                 address(registry),
                 deployerAddress,
-                auditorAgent
+                auditorAgent,
+                ensParentName
             );
         }
 

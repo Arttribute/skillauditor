@@ -434,6 +434,8 @@ async function recordOnchain(
       auditorEns: auditorAddress,
       skillName,
       version:    report.version ?? '1.0.0',
+      auditId:    auditId,
+      baseTxHash: txHash,
     }
 
     const ensName = await ensRegistry.registerSkillSubname(report.skillHash, verdictData)
