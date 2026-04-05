@@ -29,7 +29,8 @@ const X402_NETWORK          = process.env.X402_NETWORK      ?? 'base'
 const USDC_ADDRESS          = process.env.X402_USDC_ADDRESS ?? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
 
 // Coinbase-hosted x402 facilitator (verifies payment receipts)
-const X402_FACILITATOR      = process.env.X402_FACILITATOR_URL ?? 'https://x402.org/facilitate'
+// Endpoint: POST {facilitator}/verify  — body: { x402Version, paymentPayload, paymentRequirements }
+const X402_FACILITATOR      = process.env.X402_FACILITATOR_URL ?? 'https://x402.org/facilitator'
 
 // Treasury address that receives payments.
 // Set to a non-zero EVM address to enable x402. Empty string or zero address disables it.
@@ -98,18 +99,34 @@ export async function verifyX402Payment(
     return { isValid: true }
   }
   try {
-    const res = await fetch(X402_FACILITATOR, {
+    // Decode base64-encoded payment header → PaymentPayload object
+    const paymentPayload = JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf8'))
+    const paymentRequirements = requirements.accepts[0]
+
+    const res = await fetch(`${X402_FACILITATOR}/verify`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        payment:      paymentHeader,
-        requirements: requirements.accepts[0],
+        x402Version:         paymentPayload.x402Version ?? 1,
+        paymentPayload,
+        paymentRequirements,
       }),
     })
-    return (await res.json()) as FacilitatorResponse
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText)
+      console.error(`[x402] facilitator returned ${res.status}: ${errText}`)
+      return { isValid: false, error: `Facilitator error ${res.status}` }
+    }
+
+    const data = await res.json() as { isValid: boolean; invalidReason?: string; error?: string }
+    return {
+      isValid: data.isValid,
+      error:   data.invalidReason ?? data.error,
+    }
   } catch (err) {
     console.error('[x402] facilitator unreachable:', (err as Error).message)
-    return { isValid: false, error: 'Facilitator unreachable' }
+    return { isValid: false, error: (err as Error).message }
   }
 }
 
