@@ -80,20 +80,26 @@ export function generateSignedChallenge(nonce: string): string {
 export async function verifyWorldIDProof(
   input: WorldIDProofInput,
 ): Promise<WorldIDVerificationResult> {
-  // Dev bypass — when RP_ID not configured, proof is empty (dev stub), or nullifier is dev-prefixed.
-  // This allows staging/dev to run without a real World App while production enforces real proofs.
-  const isDevProof = !input.proof || input.nullifier_hash.startsWith('dev_')
-  if (!WORLD_RP_ID || (isDevProof && process.env.NODE_ENV !== 'production')) {
-    if (!WORLD_RP_ID) {
-      console.warn(
-        '[world-id] WORLD_RP_ID not set — dev bypass active. ' +
-        'Set WORLD_RP_ID and WORLD_RP_SIGNING_KEY for production.',
-      )
-    } else {
-      console.warn('[world-id] Dev/stub proof received — bypassing World ID API (NODE_ENV !== production).')
-    }
+  // Bypass 1 — WORLD_RP_ID not configured: full dev mode, no verification.
+  if (!WORLD_RP_ID) {
+    console.warn(
+      '[world-id] WORLD_RP_ID not set — dev bypass active. ' +
+      'Set WORLD_RP_ID and WORLD_RP_SIGNING_KEY for production.',
+    )
     return {
       nullifier_hash:     input.nullifier_hash || `dev_${Date.now()}`,
+      verification_level: 'device',
+      isDev:              true,
+    }
+  }
+
+  // Bypass 2 — No proof submitted: World ID is optional.
+  // Users who verify with World ID get a real nullifier for rate limiting.
+  // Users who skip it proceed with a synthetic nullifier (treated as anonymous).
+  const hasProof = !!input.proof && !!input.merkle_root && !!input.nullifier_hash
+  if (!hasProof) {
+    return {
+      nullifier_hash:     `anon_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       verification_level: 'device',
       isDev:              true,
     }

@@ -322,7 +322,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
   // Payment amount from current pending requirements or default
   const paymentAmountDisplay = pendingPayment
     ? usdcDisplay(pendingPayment.requirements.accepts[0]?.maxAmountRequired ?? '100000')
-    : tier === 'pro' ? '$5.00' : '$0.10'
+    : tier === 'pro' ? '$1.00' : '$0.10'
 
   // What tier would require payment on next submit (for free tier quota badge)
   const freeTierNeedsPayment = quota?.exhausted && tier === 'free'
@@ -413,7 +413,7 @@ export function SubmitForm({ userId }: SubmitFormProps) {
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                 tier === 'pro' ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-500'
               }`}>
-                $5.00 USDC
+                $1.00 USDC
               </span>
             </div>
             <p className={`text-xs mt-0.5 ${tier === 'pro' ? 'text-zinc-300' : 'text-zinc-400'}`}>
@@ -440,17 +440,20 @@ export function SubmitForm({ userId }: SubmitFormProps) {
         {tier === 'pro' && (
           <p className="text-xs text-zinc-400 mt-0.5">
             Pro audits write a tamper-proof stamp to Base and register an ENS subname.
-            $5.00 USDC on Base — just a signature, no gas from your wallet.
+            $1.00 USDC — just a signature, no gas from your wallet.
           </p>
         )}
       </div>
 
-      {/* World ID verification */}
+      {/* World ID verification — optional */}
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 flex items-center justify-between gap-4">
         <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-medium text-zinc-700">Human Verification</p>
+          <p className="text-sm font-medium text-zinc-700">
+            Human Verification
+            <span className="ml-2 text-[10px] font-normal text-zinc-400 uppercase tracking-wide">optional</span>
+          </p>
           <p className="text-xs text-zinc-400">
-            World ID ensures each skill is submitted by a verified human — not a bot.
+            Verify with World ID to unlock a higher free quota. You can skip this and submit directly.
           </p>
         </div>
         {worldIdProof ? (

@@ -149,7 +149,10 @@ export const proPaymentGate = createMiddleware(async (c, next) => {
   // Check for payment header
   const paymentHeader = c.req.header('X-Payment')
 
-  const resourceUrl = `${c.req.url.split('?')[0]}`
+  // Force https:// — behind a reverse proxy the internal URL may be http://
+  // but the x402 facilitator validates against the public-facing URL.
+  const rawUrl = c.req.url.split('?')[0]
+  const resourceUrl = rawUrl.replace(/^http:\/\//, 'https://')
   const requirements = buildProPaymentRequirements(resourceUrl)
 
   if (!paymentHeader) {
