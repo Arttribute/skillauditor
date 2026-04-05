@@ -16,6 +16,7 @@ import auditsRoute from './routes/v1/audits.js'
 import skillsRoute from './routes/v1/skills.js'
 import verifyRoute from './routes/v1/verify.js'
 import ledgerRoute from './routes/v1/ledger.js'
+import ensRoute    from './routes/v1/ens.js'
 
 // Routes — management (auth required)
 import usersRoute from './routes/management/users.js'
@@ -64,6 +65,7 @@ app.use('/v1/*', generalRateLimit)
 app.route('/v1/skills', skillsRoute)
 app.route('/v1/verify', verifyRoute)
 app.route('/v1/audits', auditsRoute)
+app.route('/v1/ens',    ensRoute)
 
 // World ID gated + x402 Pro payment gate — auth handled inside the route
 app.use('/v1/submit', submitRateLimit)
