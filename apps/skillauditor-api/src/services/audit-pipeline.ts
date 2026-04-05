@@ -3,11 +3,13 @@ import { runStaticAnalysis }  from './static-analyzer.js'
 import { runContentAnalysis } from './content-analyst.js'
 import { runSandboxAnalysis, type SandboxToolEvent } from './sandbox-runner.js'
 import { runVerdictAgent }    from './verdict-agent.js'
-import { createAuditAgent }   from './agentkit-session.js'
 import { uploadAuditReport }  from './ipfs.js'
+import { onchainRegistry }   from './onchain-registry.js'
+import { ensRegistry }       from './ens-registry.js'
 import { Audit } from '../db/models/audit.js'
 import { Skill } from '../db/models/skill.js'
 import type { AuditReport, VerdictData } from '@skillauditor/skill-types'
+import type { Hex } from 'viem'
 
 export interface SubmissionInput {
   skillContent: string
@@ -381,29 +383,27 @@ async function recordOnchain(
   skillName: string,
   log:       PipelineLogger,
 ): Promise<void> {
-  log.info('onchain', 'Creating audit agent session…')
+  // Derive the auditor wallet address from AUDITOR_AGENT_PRIVATE_KEY (for metadata only).
+  let auditorAddress = ''
+  try {
+    const pk = process.env.AUDITOR_AGENT_PRIVATE_KEY as Hex | undefined
+    if (pk) {
+      const { privateKeyToAccount } = await import('viem/accounts')
+      auditorAddress = privateKeyToAccount(pk).address
+    }
+  } catch { /* non-fatal */ }
+
+  log.info('onchain', `Recording stamp on Base Sepolia — skillHash=${report.skillHash.slice(0, 12)}…`)
   await log.flush()
 
-  // Create or resume CDP wallet session keyed by World ID nullifier.
-  // In dev mode (no CDP creds) falls back to AUDITOR_AGENT_PRIVATE_KEY via viem.
-  const agent = await createAuditAgent(nullifier)
-  log.info('onchain', `Agent ready — wallet=${agent.walletAddress} mode=${agent.mode}`)
-  await log.flush()
-
-  // ── Step 1: Write audit stamp to SkillRegistry ────────────────────────────
-  // Proposes the action to /v1/ledger/propose, waits for Ledger hardware
-  // signature, then broadcasts. Gate is bypassed when ledger routes return 501.
-  const auditedAt = Math.floor(Date.now() / 1000)
-
-  const { txHash } = await agent.writeRegistryStampAction({
+  // ── Step 1: Write audit stamp to SkillRegistry (Base Sepolia) ────────────
+  const { txHash } = await onchainRegistry.recordStamp({
     skillHash:  report.skillHash,
     verdict:    report.verdict,
     score:      report.overallScore,
     reportCid:  report.reportCid ?? '',
-    nullifier,
     ensSubname: '',   // updated after ENS registration below
-    skillName,
-    auditedAt,
+    nullifier,
   })
 
   await Audit.updateOne(
@@ -421,26 +421,22 @@ async function recordOnchain(
   log.info('onchain', `Stamp confirmed — txHash: ${txHash}`)
   await log.flush()
 
-  // ── Step 2: Register ENS subname ──────────────────────────────────────────
-  // Registers {hash8}.skills.auditor.eth with verdict + score text records.
-  // Also goes through the Ledger approval gate.
-  // Non-fatal — degrades gracefully when ENS infrastructure not yet deployed (Blocker 1).
+  // ── Step 2: Register ENS subname (Ethereum Sepolia) ───────────────────────
+  // Non-fatal — degrades gracefully when ENS infrastructure is not configured.
   try {
+    const auditedAt = Math.floor(Date.now() / 1000)
+
     const verdictData: VerdictData = {
       verdict:    report.verdict,
       score:      report.overallScore,
       reportCid:  report.reportCid ?? '',
       auditedAt,
-      auditorEns: agent.walletAddress,   // wallet address until ENS name is assigned
+      auditorEns: auditorAddress,
       skillName,
       version:    report.version ?? '1.0.0',
     }
 
-    const { ensName } = await agent.registerENSSubnameAction({
-      skillHash:   report.skillHash,
-      verdictData,
-      nullifier,
-    })
+    const ensName = await ensRegistry.registerSkillSubname(report.skillHash, verdictData)
 
     await Promise.all([
       Audit.updateOne(
