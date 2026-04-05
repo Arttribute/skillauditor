@@ -22,11 +22,19 @@ const PRO_AUDIT_AMOUNT_USDC      = '1000000'
 // $0.10 USDC — micropayment for free tier after the 3/month quota is exhausted
 const FREE_OVERFLOW_AMOUNT_USDC  = '100000'
 
-// Network + USDC address — configurable for testnet demos.
-// Set X402_NETWORK=base-sepolia and X402_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
-// to use Base Sepolia testnet USDC instead of Base mainnet.
-const X402_NETWORK          = process.env.X402_NETWORK      ?? 'base'
-const USDC_ADDRESS          = process.env.X402_USDC_ADDRESS ?? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+// Network + USDC address.
+// x402.org facilitator supports base-sepolia (v1 EVM) and base mainnet is not
+// yet supported by the public facilitator, so we default to base-sepolia.
+const X402_NETWORK          = process.env.X402_NETWORK      ?? 'base-sepolia'
+const USDC_ADDRESS          = process.env.X402_USDC_ADDRESS ?? '0x036CbD53842c5426634e7929541eC2318f3dCF7e'
+
+// EIP-712 domain name for the USDC contract — must match what the contract
+// returns on-chain. The x402 facilitator uses this to verify signatures.
+const USDC_DOMAIN_NAMES: Record<string, string> = {
+  'base':         'USD Coin',
+  'base-sepolia': 'USDC',
+}
+const USDC_DOMAIN_NAME = USDC_DOMAIN_NAMES[X402_NETWORK] ?? 'USD Coin'
 
 // Coinbase-hosted x402 facilitator (verifies payment receipts)
 // Endpoint: POST {facilitator}/verify  — body: { x402Version, paymentPayload, paymentRequirements }
@@ -53,7 +61,7 @@ function buildProPaymentRequirements(resourceUrl: string) {
         payTo:              TREASURY_ADDRESS,
         maxTimeoutSeconds:  300,
         asset:              USDC_ADDRESS,
-        extra: { name: 'USD Coin', version: '2' },
+        extra: { name: USDC_DOMAIN_NAME, version: '2' },
       },
     ],
     error: 'Payment required for Pro tier audit',
@@ -75,7 +83,7 @@ export function buildFreeOverflowRequirements(resourceUrl: string) {
         payTo:              TREASURY_ADDRESS,
         maxTimeoutSeconds:  300,
         asset:              USDC_ADDRESS,
-        extra: { name: 'USD Coin', version: '2' },
+        extra: { name: USDC_DOMAIN_NAME, version: '2' },
       },
     ],
     error: 'Free monthly quota exhausted — $0.10 USDC required for additional verifications',
