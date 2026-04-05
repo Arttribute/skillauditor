@@ -83,14 +83,23 @@ async function buildPaymentHeader(
   const validBefore = BigInt(now + req.maxTimeoutSeconds).toString()
   const nonce       = generateNonce()
 
+  // EIP712Domain must be explicitly included in types for MetaMask compatibility.
+  // MetaMask v11+ rejects or computes the domain hash differently when EIP712Domain
+  // is absent — viem always includes it; we follow the same pattern.
   const typedData = {
     domain: {
-      name:              req.extra?.name    ?? 'USD Coin',
+      name:              req.extra?.name    ?? 'USDC',
       version:           req.extra?.version ?? '2',
-      chainId:           NETWORK_CHAIN_IDS[req.network] ?? 8453,
+      chainId:           NETWORK_CHAIN_IDS[req.network] ?? 84532,
       verifyingContract: req.asset,
     },
     types: {
+      EIP712Domain: [
+        { name: 'name',              type: 'string'  },
+        { name: 'version',           type: 'string'  },
+        { name: 'chainId',           type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
+      ],
       TransferWithAuthorization: [
         { name: 'from',        type: 'address' },
         { name: 'to',          type: 'address' },

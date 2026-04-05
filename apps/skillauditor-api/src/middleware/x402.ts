@@ -111,23 +111,38 @@ export async function verifyX402Payment(
     const paymentPayload = JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf8'))
     const paymentRequirements = requirements.accepts[0]
 
+    // Debug log — remove after confirming end-to-end works
+    console.log('[x402] verifying payment:', JSON.stringify({
+      network:    paymentPayload.network,
+      from:       paymentPayload.payload?.authorization?.from,
+      to:         paymentPayload.payload?.authorization?.to,
+      value:      paymentPayload.payload?.authorization?.value,
+      sigLen:     paymentPayload.payload?.signature?.length,
+      reqNetwork: paymentRequirements?.network,
+      reqName:    paymentRequirements?.extra?.name,
+      reqAsset:   paymentRequirements?.asset,
+    }))
+
+    const body = JSON.stringify({
+      x402Version:         paymentPayload.x402Version ?? 1,
+      paymentPayload,
+      paymentRequirements,
+    })
+
     const res = await fetch(`${X402_FACILITATOR}/verify`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        x402Version:         paymentPayload.x402Version ?? 1,
-        paymentPayload,
-        paymentRequirements,
-      }),
+      body,
     })
 
     if (!res.ok) {
       const errText = await res.text().catch(() => res.statusText)
-      console.error(`[x402] facilitator returned ${res.status}: ${errText}`)
+      console.error(`[x402] facilitator returned ${res.status}: ${errText.slice(0, 200)}`)
       return { isValid: false, error: `Facilitator error ${res.status}` }
     }
 
     const data = await res.json() as { isValid: boolean; invalidReason?: string; error?: string }
+    console.log('[x402] facilitator response:', JSON.stringify(data))
     return {
       isValid: data.isValid,
       error:   data.invalidReason ?? data.error,
