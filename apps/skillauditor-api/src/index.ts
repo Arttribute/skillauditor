@@ -73,7 +73,7 @@ app.route('/v1/submit', submitRoute)
 // World AgentKit gated — third-party human-backed agents
 // worldAgentkitMiddleware verifies the `agentkit` header (SIWE signature + AgentBook
 // human-identity lookup) before the request reaches the submit handler.
-// proPaymentGate is applied so Pro tier agent submissions also require $9 USDC on Base.
+// proPaymentGate is applied so Pro tier agent submissions also require $5 USDC on Base.
 app.use('/v1/agent/submit', submitRateLimit)
 app.use('/v1/agent/submit', worldAgentkitMiddleware)
 app.use('/v1/agent/submit', proPaymentGate)

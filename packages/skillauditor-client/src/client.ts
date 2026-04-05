@@ -48,7 +48,7 @@ export interface SkillAuditorClientOptions {
 
   /**
    * "free" (default) — LLM audit only, no onchain stamp, no payment required.
-   * "pro"            — full audit + onchain stamp + ENS subname, requires $9 USDC payment.
+   * "pro"            — full audit + onchain stamp + ENS subname, requires $5 USDC payment.
    */
   tier?: 'free' | 'pro'
 
@@ -114,7 +114,7 @@ export class SkillAuditorClient {
   private readonly rejectOnUnsafe: boolean
 
   constructor(opts: SkillAuditorClientOptions = {}) {
-    this.apiUrl         = (opts.apiUrl ?? 'http://localhost:3001').replace(/\/$/, '')
+    this.apiUrl         = (opts.apiUrl ?? process.env.SKILLAUDITOR_API_URL ?? 'https://api.skillauditor.dev').replace(/\/$/, '')
     this.privateKey     = opts.privateKey ?? 'dev'
     this.tier           = opts.tier ?? 'free'
     this.paymentHandler = opts.paymentHandler

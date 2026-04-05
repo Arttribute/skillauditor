@@ -3,7 +3,7 @@
 // Implements the x402 payment protocol for machine-native USDC payments on Base.
 // When a Pro audit is requested without a verified payment:
 //   1. Returns HTTP 402 with payment requirements in the response body
-//   2. The client (agent or browser) pays $9 USDC on Base
+//   2. The client (agent or browser) pays $5 USDC on Base
 //   3. Client retries with X-Payment header containing the payment receipt
 //   4. This middleware verifies the receipt with the x402 facilitator
 //   5. If valid, request proceeds to the audit pipeline
@@ -16,40 +16,68 @@
 
 import { createMiddleware } from 'hono/factory'
 
-// $9.00 USDC — USDC has 6 decimal places
-const PRO_AUDIT_AMOUNT_USDC = '9000000'
+// $1.00 USDC — full Pro audit with onchain stamp + ENS subname
+const PRO_AUDIT_AMOUNT_USDC      = '1000000'
 
-// USDC contract on Base mainnet
-const USDC_BASE             = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+// $0.10 USDC — micropayment for free tier after the 3/month quota is exhausted
+const FREE_OVERFLOW_AMOUNT_USDC  = '100000'
+
+// Network + USDC address — configurable for testnet demos.
+// Set X402_NETWORK=base-sepolia and X402_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+// to use Base Sepolia testnet USDC instead of Base mainnet.
+const X402_NETWORK          = process.env.X402_NETWORK      ?? 'base'
+const USDC_ADDRESS          = process.env.X402_USDC_ADDRESS ?? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
 
 // Coinbase-hosted x402 facilitator (verifies payment receipts)
 const X402_FACILITATOR      = process.env.X402_FACILITATOR_URL ?? 'https://x402.org/facilitate'
 
-const TREASURY_ADDRESS      = process.env.SKILLAUDITOR_TREASURY_ADDRESS ?? ''
+// Treasury address that receives payments.
+// Set to a non-zero EVM address to enable x402. Empty string or zero address disables it.
+const _rawTreasury          = process.env.SKILLAUDITOR_TREASURY_ADDRESS ?? ''
+const TREASURY_ADDRESS      = _rawTreasury === '0x0000000000000000000000000000000000000000' ? '' : _rawTreasury
 
-// ── Payment requirements response body (x402 spec) ────────────────────────────
+// ── Payment requirements builders ─────────────────────────────────────────────
 
-function buildPaymentRequirements(resourceUrl: string) {
+function buildProPaymentRequirements(resourceUrl: string) {
   return {
     x402Version: 1,
     accepts: [
       {
         scheme:             'exact',
-        network:            'base',
+        network:            X402_NETWORK,
         maxAmountRequired:  PRO_AUDIT_AMOUNT_USDC,
         resource:           resourceUrl,
-        description:        'Pro skill audit — semantic analysis + onchain stamp + ENS subname',
+        description:        'Pro skill audit — semantic analysis + onchain stamp + ENS subname ($1.00 USDC)',
         mimeType:           'application/json',
         payTo:              TREASURY_ADDRESS,
         maxTimeoutSeconds:  300,
-        asset:              USDC_BASE,
-        extra: {
-          name:    'USD Coin',
-          version: '2',
-        },
+        asset:              USDC_ADDRESS,
+        extra: { name: 'USD Coin', version: '2' },
       },
     ],
     error: 'Payment required for Pro tier audit',
+  }
+}
+
+// Exported so submit.ts can return this directly as a 402 body.
+export function buildFreeOverflowRequirements(resourceUrl: string) {
+  return {
+    x402Version: 1,
+    accepts: [
+      {
+        scheme:             'exact',
+        network:            X402_NETWORK,
+        maxAmountRequired:  FREE_OVERFLOW_AMOUNT_USDC,
+        resource:           resourceUrl,
+        description:        'Skill verification — monthly free quota exceeded ($0.10 USDC per check)',
+        mimeType:           'application/json',
+        payTo:              TREASURY_ADDRESS,
+        maxTimeoutSeconds:  300,
+        asset:              USDC_ADDRESS,
+        extra: { name: 'USD Coin', version: '2' },
+      },
+    ],
+    error: 'Free monthly quota exhausted — $0.10 USDC required for additional verifications',
   }
 }
 
@@ -60,10 +88,15 @@ interface FacilitatorResponse {
   error?:   string
 }
 
-async function verifyPaymentReceipt(
+// Exported so submit routes can verify micropayments inline.
+export async function verifyX402Payment(
   paymentHeader: string,
-  requirements:  ReturnType<typeof buildPaymentRequirements>,
+  requirements:  ReturnType<typeof buildProPaymentRequirements | typeof buildFreeOverflowRequirements>,
 ): Promise<FacilitatorResponse> {
+  if (!TREASURY_ADDRESS) {
+    // Dev mode — payment gate disabled, treat any header as valid
+    return { isValid: true }
+  }
   try {
     const res = await fetch(X402_FACILITATOR, {
       method:  'POST',
@@ -79,6 +112,9 @@ async function verifyPaymentReceipt(
     return { isValid: false, error: 'Facilitator unreachable' }
   }
 }
+
+// Backward-compat alias used inside proPaymentGate below
+const verifyPaymentReceipt = verifyX402Payment
 
 // ── Middleware factory ────────────────────────────────────────────────────────
 //
@@ -114,7 +150,7 @@ export const proPaymentGate = createMiddleware(async (c, next) => {
   const paymentHeader = c.req.header('X-Payment')
 
   const resourceUrl = `${c.req.url.split('?')[0]}`
-  const requirements = buildPaymentRequirements(resourceUrl)
+  const requirements = buildProPaymentRequirements(resourceUrl)
 
   if (!paymentHeader) {
     return c.json(requirements, 402)

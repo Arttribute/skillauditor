@@ -17,9 +17,11 @@ const WORLD_ACTION      = process.env.WORLD_ACTION ?? 'submit-skill-for-audit'
 
 const VERIFY_ENDPOINT   = 'https://developer.world.org/api/v4/verify'
 
-// Rate limits — enforced via MongoDB count query
-const FREE_AUDITS_PER_DAY = 5
-const PRO_AUDITS_PER_DAY  = 1
+// Free tier quota — 3 audits per 30-day rolling window per verified human.
+// After the quota is exhausted each additional verification costs $0.10 USDC
+// (enforced via x402 micropayment in the submit route).
+const FREE_AUDITS_PER_MONTH   = 3
+const FREE_QUOTA_WINDOW_MS    = 30 * 24 * 60 * 60 * 1000
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,19 @@ export interface NullifierRateLimitResult {
   allowed:   boolean
   remaining: number
   resetAt:   Date
+}
+
+export interface FreeQuotaResult {
+  /** Audits consumed this 30-day window */
+  used:        number
+  /** Total monthly free allowance (3) */
+  total:       number
+  /** How many free audits remain before micropayment is required */
+  remaining:   number
+  /** When the oldest in-window audit falls off (first slot freed) */
+  resetAt:     Date
+  /** True when the free monthly quota is fully used — micropayment required */
+  exhausted:   boolean
 }
 
 // ── Signal generation (for frontend challenge flow) ───────────────────────────
@@ -144,30 +159,66 @@ export async function verifyWorldIDProof(
   }
 }
 
-// ── Nullifier rate limiting ───────────────────────────────────────────────────
+// ── Free tier quota check ─────────────────────────────────────────────────────
 //
-// Queries the Audit collection directly — no separate table needed.
-// Window: last 24 hours (rolling).
+// Counts free-tier audits within a 30-day rolling window.
+// Pro-tier audits are not counted (they are individually paid).
+//
+// When exhausted, the submit route returns HTTP 402 with $0.10 USDC requirements
+// instead of a hard 429, giving the user a path to continue.
+
+export async function checkFreeQuota(nullifier: string): Promise<FreeQuotaResult> {
+  const windowStart = new Date(Date.now() - FREE_QUOTA_WINDOW_MS)
+
+  const used = await Audit.countDocuments({
+    'submittedBy.worldIdNullifier': nullifier,
+    'submittedBy.submittedAt':      { $gte: windowStart },
+    tier:                           'free',
+    status:                         { $in: ['pending', 'running', 'completed'] },
+  })
+
+  // resetAt = when the earliest in-window audit falls out of the 30-day window
+  const earliest = await Audit.findOne({
+    'submittedBy.worldIdNullifier': nullifier,
+    'submittedBy.submittedAt':      { $gte: windowStart },
+    tier:                           'free',
+    status:                         { $in: ['pending', 'running', 'completed'] },
+  }, { 'submittedBy.submittedAt': 1 }).sort({ 'submittedBy.submittedAt': 1 }).lean()
+
+  const earliestDate = earliest
+    ? (earliest as Record<string, Record<string, unknown>>).submittedBy?.submittedAt as Date
+    : windowStart
+
+  const resetAt = new Date((earliestDate as Date).getTime() + FREE_QUOTA_WINDOW_MS)
+
+  return {
+    used,
+    total:     FREE_AUDITS_PER_MONTH,
+    remaining: Math.max(0, FREE_AUDITS_PER_MONTH - used),
+    resetAt,
+    exhausted: used >= FREE_AUDITS_PER_MONTH,
+  }
+}
+
+// ── Nullifier rate limiting (legacy — kept for agent-submit compatibility) ────
+//
+// Agents use this for a simple allowed/remaining check. Browser submissions
+// now go through checkFreeQuota + x402 micropayment in the submit route.
 
 export async function checkNullifierRateLimit(
   nullifier: string,
   tier: 'free' | 'pro',
 ): Promise<NullifierRateLimitResult> {
-  const limit   = tier === 'pro' ? PRO_AUDITS_PER_DAY : FREE_AUDITS_PER_DAY
-  const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  if (tier === 'pro') {
+    // Pro tier has no hard cap — each submission is individually paid via x402.
+    return { allowed: true, remaining: 999, resetAt: new Date() }
+  }
 
-  const count = await Audit.countDocuments({
-    'submittedBy.worldIdNullifier': nullifier,
-    'submittedBy.submittedAt':      { $gte: windowStart },
-    status:                         { $in: ['pending', 'running', 'completed'] },
-  })
-
-  const resetAt = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000)
-
+  const quota = await checkFreeQuota(nullifier)
   return {
-    allowed:   count < limit,
-    remaining: Math.max(0, limit - count),
-    resetAt,
+    allowed:   !quota.exhausted,
+    remaining: quota.remaining,
+    resetAt:   quota.resetAt,
   }
 }
 

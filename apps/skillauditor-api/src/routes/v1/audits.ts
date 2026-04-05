@@ -1,7 +1,44 @@
 import { Hono } from 'hono'
 import { Audit } from '../../db/models/audit.js'
+import { checkFreeQuota } from '../../services/world-id.js'
 
 const audits = new Hono()
+
+// GET /v1/audits/quota?nullifier_hash=xxx
+//
+// Returns the free tier monthly quota status for a verified human.
+// Used by the frontend to show remaining free audits after World ID verification.
+// Does NOT verify the proof — callers must have already verified the nullifier
+// with World ID. Dev nullifiers (dev_ prefix) always return full quota.
+audits.get('/quota', async (c) => {
+  const nullifier = c.req.query('nullifier_hash')
+  if (!nullifier) {
+    return c.json({ error: 'nullifier_hash query parameter is required' }, 400)
+  }
+
+  // Dev nullifiers always get full quota (no DB lookup needed)
+  if (nullifier.startsWith('dev_')) {
+    return c.json({
+      used:             0,
+      total:            3,
+      remaining:        3,
+      resetAt:          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      exhausted:        false,
+      micropayment:     { required: false, amountUsd: '0.10' },
+    })
+  }
+
+  const quota = await checkFreeQuota(nullifier)
+
+  return c.json({
+    used:         quota.used,
+    total:        quota.total,
+    remaining:    quota.remaining,
+    resetAt:      quota.resetAt.toISOString(),
+    exhausted:    quota.exhausted,
+    micropayment: { required: quota.exhausted, amountUsd: '0.10' },
+  })
+})
 
 // GET /v1/audits/:auditId — poll for audit status and result
 audits.get('/:auditId', async (c) => {

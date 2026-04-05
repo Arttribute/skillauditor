@@ -29,7 +29,7 @@ const HELP = `
   --key  <0x...>      EVM private key for World AgentKit signing
                         Omit to use dev bypass (local API only)
   --api-url <url>     SkillAuditor API base URL
-                        (default: http://localhost:3001)
+                        (default: https://api.skillauditor.dev)
   --verbose           Show every sandbox tool call in output
   --silent            No output — use exit code only
   --no-reject         Exit 0 even if skill is unsafe
@@ -59,12 +59,12 @@ const HELP = `
   # Silent gate — use in scripts / CI
   skillauditor verify ./SKILL.md --silent && echo "safe to load"
 
-  # Point at a remote API
-  skillauditor verify ./SKILL.md --api-url https://api.skillauditor.xyz
+  # Point at a custom API (defaults to https://api.skillauditor.dev)
+  skillauditor verify ./SKILL.md --api-url https://api.skillauditor.dev
 
 \x1b[1mWORLD AGENTKIT (Pro tier)\x1b[0m
   Pro audits require a World ID-verified agent wallet. The payment is
-  automatically handled via the x402 protocol ($9 USDC on Base).
+  automatically handled via the x402 protocol ($1.00 USDC on Base).
 
   1. Register your wallet: npx @worldcoin/agentkit-cli register <address>
   2. Fund it with USDC on Base (or Base Sepolia for testnet)
@@ -79,7 +79,7 @@ function parseCliArgs(argv: string[]) {
     options: {
       tier:        { type: 'string',  default: 'free' },
       key:         { type: 'string',  default: 'dev'  },
-      'api-url':   { type: 'string',  default: 'http://localhost:3001' },
+      'api-url':   { type: 'string',  default: process.env.SKILLAUDITOR_API_URL ?? 'https://api.skillauditor.dev' },
       verbose:     { type: 'boolean', default: false },
       silent:      { type: 'boolean', default: false },
       'no-reject': { type: 'boolean', default: false },

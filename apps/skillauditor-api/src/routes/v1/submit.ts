@@ -4,10 +4,14 @@ import { Audit } from '../../db/models/audit.js'
 import { runStaticAnalysis } from '../../services/static-analyzer.js'
 import {
   verifyWorldIDProof,
-  checkNullifierRateLimit,
+  checkFreeQuota,
   WorldIDVerificationError,
   type WorldIDProofInput,
 } from '../../services/world-id.js'
+import {
+  buildFreeOverflowRequirements,
+  verifyX402Payment,
+} from '../../middleware/x402.js'
 
 const submit = new Hono()
 
@@ -88,19 +92,43 @@ submit.post('/', async (c) => {
 
   const { nullifier_hash, verification_level } = verificationResult
 
-  // ── Nullifier rate limiting ────────────────────────────────────────────────
-  // Skip rate limit for dev nullifiers (no production enforcement)
-  if (!verificationResult.isDev) {
-    const rateCheck = await checkNullifierRateLimit(nullifier_hash, tier)
-    if (!rateCheck.allowed) {
-      return c.json(
-        {
-          error:     `Rate limit exceeded — ${tier} tier allows ${tier === 'pro' ? 1 : 5} audit(s) per 24 hours per verified human`,
-          remaining: 0,
-          resetAt:   rateCheck.resetAt,
-        },
-        429,
-      )
+  // ── Free tier quota enforcement ───────────────────────────────────────────
+  // Pro tier: payment gate handled upstream by proPaymentGate middleware.
+  // Free tier: 3 audits per 30-day rolling window per verified human.
+  //   - Within quota → proceeds free.
+  //   - Quota exhausted, no X-Payment → returns 402 with $0.10 requirements.
+  //   - Quota exhausted, X-Payment present → verifies and proceeds.
+  // Dev nullifiers skip enforcement entirely.
+  if (tier === 'free' && !verificationResult.isDev) {
+    const quota = await checkFreeQuota(nullifier_hash)
+    if (quota.exhausted) {
+      const resourceUrl = c.req.url.split('?')[0]
+      const requirements = buildFreeOverflowRequirements(resourceUrl)
+      const paymentHeader = c.req.header('X-Payment')
+
+      if (!paymentHeader) {
+        // No payment — tell the client what is required
+        return c.json(
+          {
+            ...requirements,
+            quota: { used: quota.used, total: quota.total, resetAt: quota.resetAt },
+          },
+          402,
+        )
+      }
+
+      // Payment header present — verify it
+      const verification = await verifyX402Payment(paymentHeader, requirements)
+      if (!verification.isValid) {
+        return c.json(
+          {
+            error:  'Payment verification failed',
+            detail: verification.error ?? 'Invalid payment receipt',
+          },
+          402,
+        )
+      }
+      // Verified — proceed as a paid free-tier submission
     }
   }
 

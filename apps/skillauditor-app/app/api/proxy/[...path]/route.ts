@@ -24,6 +24,10 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   const apiKey = request.headers.get('X-API-Key')
   if (apiKey) headers['X-API-Key'] = apiKey
 
+  // Forward x402 payment header if present (Pro tier USDC payment)
+  const payment = request.headers.get('X-Payment')
+  if (payment) headers['X-Payment'] = payment
+
   const url = new URL(apiPath, API_URL)
   // Forward query params
   request.nextUrl.searchParams.forEach((v, k) => url.searchParams.set(k, v))
